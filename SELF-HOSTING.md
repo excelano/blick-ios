@@ -6,7 +6,7 @@ You will need a Mac with a version of Xcode that supports the iOS and watchOS de
 
 ## Step 1: Clone and choose your identifiers
 
-1. Fork [excelano/blick](https://github.com/excelano/blick) on GitHub, or just clone it directly.
+1. Fork [excelano/blick-ios](https://github.com/excelano/blick-ios) on GitHub, or just clone it directly.
 2. Decide on your **bundle ID** (for example, `com.example.blick`). It must be unique to your Apple Developer team.
 3. Decide on your **redirect URI scheme**. The MSAL convention is `msauth.<bundle-id>`, so a bundle ID of `com.example.blick` gives a redirect URI scheme of `msauth.com.example.blick` and a full redirect URI of `msauth.com.example.blick://auth`. The widget extension is a second bundle, `<bundle-id>.CheckInWidget`, with its own redirect URI, `msauth.<bundle-id>.CheckInWidget://auth`. You register both in Azure (Step 4), because the interactive widget authenticates under the extension's own bundle ID.
 

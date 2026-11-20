@@ -1,4 +1,4 @@
-# CLAUDE.md — Blick (excelano/blick)
+# CLAUDE.md — Blick (excelano/blick-ios)
 
 Project-specific guidance for Blick. Global working style, writing standards, and
 language preferences live in `~/.claude/CLAUDE.md` (loads in every session); the
@@ -9,7 +9,7 @@ This repo's prose documents follow the fleet documentation standard in
 
 ---
 
-Microsoft 365 app for iOS — meetings, mail, Teams chats, and presence on iPhone, iPad, and Apple Watch. Repo at `~/repos/m365/blick` on the Debian box and `~/email/blick` on the Mac, GitHub repo `excelano/blick`. Every path, target, package, scheme, and Swift symbol carries the Blick name; the identifiers that deliberately still say `checkin` are listed below.
+Microsoft 365 app for iOS — meetings, mail, Teams chats, and presence on iPhone, iPad, and Apple Watch. Repo at `~/repos/m365/blick-ios` on the Debian box and `~/email/blick-ios` on the Mac, GitHub repo `excelano/blick-ios`. Every path, target, package, scheme, and Swift symbol carries the Blick name; the identifiers that deliberately still say `checkin` are listed below.
 
 ## Identifiers that stay `checkin` (do not rename)
 
