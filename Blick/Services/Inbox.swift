@@ -170,6 +170,7 @@ final class Inbox {
     /// the user is pinned Offline) and outlives the process so a background
     /// refresh after relaunch honors a still-current pin.
     private let preferredStore = PreferredPresenceStore()
+    private let automaticStore = AutomaticPresenceStore()
 
     @ObservationIgnored private let logger = Logger(subsystem: "com.excelano.checkin", category: "inbox")
 
@@ -322,6 +323,7 @@ final class Inbox {
         currentPresence = fetchedPresence
         customStatusMessage = fetchedMessage
         isOutOfOffice = await oooT
+        await reconcileAutomaticPresence()
         lastRefreshedAt = Date()
         lastRefreshFailed = anyFailed || meetingsResult.failed || emailsResult.failed || chatsFailed
         await nudgeNewMessages(emails: emailsResult.failed ? nil : emailsResult.emails,
@@ -1178,6 +1180,34 @@ final class Inbox {
             currentPresence = previous
             return false
         }
+    }
+
+    func reconcileAutomaticPresence() async {
+        guard teamsEnabled, !isOutOfOffice else { return }
+        let decision = AutomaticPresence.decide(desired: automaticStore.focusPresence,
+                                                pin: preferredStore.current(),
+                                                automaticExpiry: automaticStore.automaticExpiry)
+        switch decision {
+        case .leave:
+            return
+        case .apply(let presence):
+            if await setPresence(presence) {
+                automaticStore.setAutomaticExpiry(preferredStore.current()?.expiry)
+            }
+        case .release:
+            automaticStore.setAutomaticExpiry(nil)
+            await setPresence(.unknown)
+        }
+    }
+
+    func applyFocusPresence(_ presence: Presence?) async throws {
+        automaticStore.setFocusPresence(presence)
+        guard teamsEnabled else { return }
+        _ = try await authService.acquireTokenSilentlyNoInteraction(enableTeams: teamsEnabled)
+        isOutOfOffice = await fetchOutOfOffice()
+        await reconcileAutomaticPresence()
+        BlickSnapshot.patchAndReload(presence: currentPresence, isOutOfOffice: isOutOfOffice)
+        phoneConnectivity?.pushFromAppGroup()
     }
 
     /// Enable auto-replies (`alwaysEnabled` with no end date). Optimistic
