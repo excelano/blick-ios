@@ -2,14 +2,13 @@
 # against the release being cut, so notes left from last time stop the release
 # rather than reaching the listing.
 
-version = "1.9.4"
+version = "1.9.5"
 
 [locales."en-us"]
 whats-new = """
-Web View is stricter about what an email can do. Scripts in an email no \
-longer run, and its forms cannot be sent. Until you tap Load images, nothing \
-in the email reaches the internet; when you do, only its images load, and \
-nothing a sender's server sets is kept after you close it.
+Mail, chats and the message preview show their times in the new form as \
+soon as you change a Bogenzeit setting, rather than after the next refresh \
+or scroll.
 
 As always, Blick talks only to Microsoft. No backend, no analytics, no \
 third-party SDKs.
