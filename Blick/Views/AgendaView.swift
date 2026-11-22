@@ -32,6 +32,7 @@ struct AgendaView: View {
     /// so a meeting crosses from upcoming to live to past without a
     /// refresh — the same cadence the summary's `clockTick` uses.
     @State private var clockTick: Date = .now
+    @State private var showNewMeeting = false
 
     var body: some View {
         NavigationStack {
@@ -43,6 +44,15 @@ struct AgendaView: View {
                 emptyText: "Nothing scheduled in the next \(Inbox.agendaDayCount) days."
             ) { agendaList($0) }
                 .browseListChrome(title: "Agenda", onClose: onClose)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button { showNewMeeting = true } label: {
+                            Image(systemName: "plus")
+                        }
+                        .foregroundStyle(Brand.accent)
+                        .accessibilityLabel("New meeting")
+                    }
+                }
         }
         .task { await load() }
         .task {
@@ -54,6 +64,9 @@ struct AgendaView: View {
         .preferredColorScheme(.dark)
         .sheet(item: $conflictTarget) { target in
             ConflictResolutionSheet(inbox: inbox, primaryMeetingId: target.id)
+        }
+        .sheet(isPresented: $showNewMeeting, onDismiss: { Task { await load() } }) {
+            NewMeetingView(inbox: inbox, onClose: { showNewMeeting = false })
         }
     }
 

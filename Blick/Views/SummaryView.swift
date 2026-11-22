@@ -23,6 +23,7 @@ struct SummaryView: View {
     @State private var showChatList = false
     /// The week agenda, opened by tapping the "Later today" header.
     @State private var showAgenda = false
+    @State private var showNewMeeting = false
     /// The message the user chose "Move to…" for, driving the folder picker.
     @State private var moveTarget: Email?
     /// The email a context-menu "Forward" targets. Drives a forward-mode
@@ -52,12 +53,13 @@ struct SummaryView: View {
         guard let email = NotificationRouter.shared.emailToOpen else { return }
         NotificationRouter.shared.emailToOpen = nil
         let covered = showEmailList || showChatList || showAgenda || showCompose || showSettings
-            || previewTarget != nil
+            || showNewMeeting || previewTarget != nil
         showEmailList = false
         showChatList = false
         showAgenda = false
         showCompose = false
         showSettings = false
+        showNewMeeting = false
         previewTarget = nil
         Task {
             if covered { try? await Task.sleep(for: .milliseconds(600)) }
@@ -105,6 +107,9 @@ struct SummaryView: View {
         }
         .sheet(isPresented: $showAgenda) {
             AgendaView(inbox: inbox, onClose: { showAgenda = false })
+        }
+        .sheet(isPresented: $showNewMeeting) {
+            NewMeetingView(inbox: inbox, onClose: { showNewMeeting = false })
         }
         .sheet(item: $moveTarget) { email in
             MoveToFolderSheet(inbox: inbox, email: email, onClose: { moveTarget = nil })
@@ -304,7 +309,15 @@ struct SummaryView: View {
                 }
             } header: {
                 sectionHeader(title: "Later today", count: laterMeetings.count,
-                              onOpen: { showAgenda = true }) { EmptyView() }
+                              onOpen: { showAgenda = true }) {
+                    Button { showNewMeeting = true } label: {
+                        Image(systemName: "calendar.badge.plus")
+                            .foregroundStyle(Brand.accent)
+                            .frame(width: 36, height: 36)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("New meeting")
+                }
             }
             Section {
                 if summary.chats.isEmpty {

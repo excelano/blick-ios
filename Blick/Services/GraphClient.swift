@@ -228,6 +228,36 @@ final class GraphClient {
     /// Accept/tentative/decline an event. Graph returns 202 with no body.
     /// `sendResponse: true` matches Outlook's default behavior — the
     /// organizer's tracking is updated.
+    func createMeeting(subject: String, notes: String, start: Date, end: Date,
+                       attendees: [String], teams: Bool) async throws -> String {
+        let body = CreateEventBody(
+            subject: subject,
+            body: OutgoingBodyContent(contentType: "Text", content: notes),
+            start: OutgoingDateTime(start),
+            end: OutgoingDateTime(end),
+            attendees: attendees.map {
+                OutgoingAttendeeBody(emailAddress: OutgoingAddressBody(address: $0), type: "required")
+            },
+            isOnlineMeeting: teams,
+            onlineMeetingProvider: teams ? "teamsForBusiness" : nil
+        )
+        let created: CreatedEventResponse = try await core.postDecoded("/me/events", body: body)
+        return created.id
+    }
+
+    func schedules(for addresses: [String], start: Date, end: Date,
+                   interval: Int) async throws -> [ScheduleInformationResponse] {
+        let body = GetScheduleBody(
+            schedules: addresses,
+            startTime: OutgoingDateTime(start),
+            endTime: OutgoingDateTime(end),
+            availabilityViewInterval: interval
+        )
+        let data: GraphList<ScheduleInformationResponse> = try await core.postDecoded("/me/calendar/getSchedule",
+                                                                                      body: body)
+        return data.value
+    }
+
     func respondToMeeting(id: String, response: MeetingResponse) async throws {
         let action: String
         switch response {

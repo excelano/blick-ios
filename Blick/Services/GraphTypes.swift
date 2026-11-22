@@ -391,3 +391,58 @@ struct BatchResponseItem: Decodable {
     let id: String
     let status: Int
 }
+
+struct OutgoingDateTime: Encodable {
+    let dateTime: String
+    let timeZone: String
+
+    init(_ date: Date) {
+        dateTime = Self.formatter.string(from: date)
+        timeZone = "UTC"
+    }
+
+    private static let formatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        return formatter
+    }()
+}
+
+struct OutgoingAttendeeBody: Encodable {
+    let emailAddress: OutgoingAddressBody
+    let type: String
+}
+
+struct CreateEventBody: Encodable {
+    let subject: String
+    let body: OutgoingBodyContent
+    let start: OutgoingDateTime
+    let end: OutgoingDateTime
+    let attendees: [OutgoingAttendeeBody]
+    let isOnlineMeeting: Bool
+    let onlineMeetingProvider: String?
+}
+
+struct CreatedEventResponse: Decodable {
+    let id: String
+}
+
+struct GetScheduleBody: Encodable {
+    let schedules: [String]
+    let startTime: OutgoingDateTime
+    let endTime: OutgoingDateTime
+    let availabilityViewInterval: Int
+}
+
+struct ScheduleInformationResponse: Decodable {
+    let scheduleId: String
+    let availabilityView: String?
+    let error: ScheduleErrorResponse?
+}
+
+struct ScheduleErrorResponse: Decodable {
+    let message: String?
+    let responseCode: String?
+}

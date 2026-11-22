@@ -649,6 +649,34 @@ final class Inbox {
         recomputeConflicts()
     }
 
+    func scheduleMeeting(subject: String, notes: String, start: Date, end: Date,
+                         attendees: [String], teams: Bool) async throws {
+        #if DEBUG
+        if DemoMode.isActive { return }
+        #endif
+        _ = try await graphClient.createMeeting(subject: subject, notes: notes, start: start, end: end,
+                                                attendees: attendees, teams: teams)
+        showTransient("Invitation sent for \"\(truncate(subject, maxLen: 30))\".", kind: .info)
+        await refresh()
+    }
+
+    nonisolated static let freeBusyInterval = 30
+
+    func freeBusy(for attendees: [String], from start: Date, to end: Date) async throws -> [String: FreeBusy] {
+        let me = graphClient.currentUserMail
+        let addresses = (me.isEmpty ? [] : [me]) + attendees.filter { $0.caseInsensitiveCompare(me) != .orderedSame }
+        guard !addresses.isEmpty else { return [:] }
+        let interval = Self.freeBusyInterval
+        let found = try await graphClient.schedules(for: addresses, start: start, end: end, interval: interval)
+        var result: [String: FreeBusy] = [:]
+        for info in found {
+            let view = info.error == nil ? (info.availabilityView ?? "") : ""
+            result[info.scheduleId.lowercased()] = FreeBusy(start: start, interval: TimeInterval(interval * 60),
+                                                            availabilityView: view)
+        }
+        return result
+    }
+
     /// Optimistic. Mutates the matching meeting's `responseStatus`
     /// immediately so the UI updates, and reverts on failure. After a
     /// successful RSVP, also marks any invite emails still sitting unread
