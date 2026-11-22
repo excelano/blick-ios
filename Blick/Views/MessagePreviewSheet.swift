@@ -823,6 +823,8 @@ struct MessagePreviewSheet: View {
             // phone, and six controls would not fit at all.
             if let email = forwardEmailTarget {
                 Menu {
+                    emailReminderMenu(for: email, inbox: inbox)
+                    Divider()
                     emailDispositionMenu(for: email, inbox: inbox,
                                          onMove: { _ in showingMove = true },
                                          onDisposed: { onClose() })

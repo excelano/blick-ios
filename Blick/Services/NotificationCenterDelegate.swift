@@ -22,9 +22,15 @@ final class NotificationCenterDelegate: NSObject, UNUserNotificationCenterDelega
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
-        let joinUrl = response.notification.request.content.userInfo["joinUrl"] as? String
+        let userInfo = response.notification.request.content.userInfo
+        let joinUrl = userInfo["joinUrl"] as? String
+        let email = Email(notificationUserInfo: userInfo)
         Task { @MainActor in
-            await openMeeting(joinUrlString: joinUrl)
+            if let email {
+                NotificationRouter.shared.emailToOpen = email
+            } else {
+                await openMeeting(joinUrlString: joinUrl)
+            }
             completionHandler()
         }
     }

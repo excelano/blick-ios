@@ -48,6 +48,23 @@ struct SummaryView: View {
 
     private var isRegularWidth: Bool { horizontalSizeClass == .regular }
 
+    private func openRoutedEmail() {
+        guard let email = NotificationRouter.shared.emailToOpen else { return }
+        NotificationRouter.shared.emailToOpen = nil
+        let covered = showEmailList || showChatList || showAgenda || showCompose || showSettings
+            || previewTarget != nil
+        showEmailList = false
+        showChatList = false
+        showAgenda = false
+        showCompose = false
+        showSettings = false
+        previewTarget = nil
+        Task {
+            if covered { try? await Task.sleep(for: .milliseconds(600)) }
+            previewTarget = .email(email)
+        }
+    }
+
     var body: some View {
         Group {
             if isRegularWidth {
@@ -112,6 +129,9 @@ struct SummaryView: View {
         }
         .sheet(item: $conflictTarget) { target in
             ConflictResolutionSheet(inbox: inbox, primaryMeetingId: target.id)
+        }
+        .onChange(of: NotificationRouter.shared.emailToOpen?.id, initial: true) {
+            openRoutedEmail()
         }
         .task {
             // Re-evaluate "current meeting" every 30 seconds so a
@@ -397,6 +417,7 @@ struct SummaryView: View {
                         EmailRow(
                             email: email,
                             isStarred: inbox.isStarred(email),
+                            reminder: inbox.reminders[email.id],
                             matchingMeeting: matchingMeeting,
                             onTap: {
                                 #if DEBUG
@@ -483,6 +504,7 @@ struct SummaryView: View {
                                               systemImage: inbox.isStarred(email) ? "star.slash" : "star")
                                     }
                                 }
+                                emailReminderMenu(for: email, inbox: inbox)
                                 Divider()
                                 emailDispositionMenu(for: email, inbox: inbox,
                                                      onMove: { moveTarget = $0 })

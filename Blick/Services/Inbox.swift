@@ -41,6 +41,8 @@ final class Inbox {
     private(set) var starredSenders: [StarredSender] = []
     private var starredAddresses: Set<String> = []
 
+    private(set) var reminders: [String: Date] = [:]
+
     /// Transient user-facing note, set when an optimistic action reverted
     /// because Graph rejected it (`.error`) or when a bulk action found
     /// nothing to do (`.info`). Drives a floating banner in the summary
@@ -150,6 +152,7 @@ final class Inbox {
 
     private let meetingNotifications = MeetingNotifications()
     private let messageNotifications = MessageNotifications()
+    private let emailReminders = EmailReminders()
     private let newMessageTracker = NewMessageTracker()
 
     /// Whether the app is in front of the user right now. The app wires this
@@ -225,6 +228,7 @@ final class Inbox {
         self.teamsEnabled = teamsEnabled
         self.showingAllEmails = UserDefaults.standard.bool(forKey: AppStorageKey.showingAllEmails)
         reloadStarredSenders()
+        Task { await reloadReminders() }
     }
 
     /// Drop in-memory state tied to the previous session so the next
@@ -323,6 +327,7 @@ final class Inbox {
                                chats: chatsFailed ? nil : chats)
         await updateAppBadge()
         await rescheduleMeetingNotificationsIfEnabled()
+        await reloadReminders()
         publishStatusSnapshot()
     }
 
@@ -1247,6 +1252,7 @@ final class Inbox {
         }
         do {
             let newId = try await graphClient.moveMessage(id: email.id, toFolder: destination)
+            await followReminder(of: email, to: newId)
             await updateAppBadge()
             setPendingUndo(UndoableBulkAction(summary: "\(verb) \"\(truncate(email.subject, maxLen: 30))\"") { [weak self] in
                 guard let self else { return }
@@ -1285,6 +1291,7 @@ final class Inbox {
     private func undoDispose(_ email: Email, movedId: String) async {
         do {
             let restoredId = try await graphClient.moveMessage(id: movedId, toFolder: WellKnownFolder.inbox)
+            await followReminder(of: email.with(id: movedId), to: restoredId)
             restoreEmailToGlance(email.with(id: restoredId))
             await updateAppBadge()
         } catch {
@@ -1389,6 +1396,33 @@ final class Inbox {
     private func reloadStarredSenders() {
         starredSenders = starredStore.all()
         starredAddresses = Set(starredSenders.map(\.address))
+    }
+
+    // MARK: - Email reminders
+
+    func remind(_ email: Email, at date: Date) async {
+        guard await emailReminders.schedule(email, at: date) else {
+            showTransient("Couldn't set a reminder. Allow notifications for Blick in Settings.", kind: .error)
+            return
+        }
+        await reloadReminders()
+        showTransient("Reminder set for \(date.formatted(date: .abbreviated, time: .shortened)).", kind: .info)
+    }
+
+    func cancelReminder(emailId: String) async {
+        emailReminders.cancel(emailId: emailId)
+        await reloadReminders()
+    }
+
+    func reloadReminders() async {
+        reminders = await emailReminders.pending()
+    }
+
+    private func followReminder(of email: Email, to newId: String) async {
+        guard let date = reminders[email.id] else { return }
+        emailReminders.cancel(emailId: email.id)
+        _ = await emailReminders.schedule(email.with(id: newId), at: date)
+        await reloadReminders()
     }
 
     // MARK: - Email: bulk actions

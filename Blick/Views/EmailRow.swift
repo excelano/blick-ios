@@ -12,6 +12,7 @@ struct EmailRow: View {
     /// name so the user can see at a glance who is starred without opening
     /// Settings; the menu's Star/Unstar item is the control.
     var isStarred: Bool = false
+    var reminder: Date? = nil
     /// Set when this email is a meeting invitation AND the underlying
     /// meeting is in our current summary window. Drives the inline
     /// RSVP buttons and the subject-line conflict triangle. Nil for
@@ -53,6 +54,12 @@ struct EmailRow: View {
                                 .font(.caption)
                                 .foregroundStyle(.orange)
                                 .accessibilityLabel("Flagged")
+                        }
+                        if reminder != nil {
+                            Image(systemName: "bell.fill")
+                                .font(.caption)
+                                .foregroundStyle(Brand.accent)
+                                .accessibilityLabel("Reminder set")
                         }
                         Spacer()
                         Text(relativeTime(email.received, clock: solarClock))

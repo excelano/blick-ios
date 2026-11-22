@@ -102,6 +102,7 @@ struct EmailListView: View {
                 EmailRow(
                     email: email,
                     isStarred: inbox.isStarred(email),
+                    reminder: inbox.reminders[email.id],
                     matchingMeeting: matchingMeeting,
                     onTap: { openedId = email.id; previewTarget = .email(email) },
                     onRsvp: { response in
@@ -141,6 +142,7 @@ struct EmailListView: View {
                                   systemImage: inbox.isStarred(email) ? "star.slash" : "star")
                         }
                     }
+                    emailReminderMenu(for: email, inbox: inbox)
                     Divider()
                     emailDispositionMenu(for: email, inbox: inbox,
                                          onMove: { moveTarget = $0 },

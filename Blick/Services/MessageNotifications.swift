@@ -31,7 +31,7 @@ final class MessageNotifications {
             content.body = email.preview
             content.sound = .default
             content.threadIdentifier = "blick.mail"
-            content.userInfo["emailId"] = email.id
+            content.userInfo = email.notificationUserInfo
             await add(content, id: "mail." + email.id, to: center)
         }
         for chat in chats {
