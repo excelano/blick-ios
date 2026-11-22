@@ -60,6 +60,32 @@ struct BrowseListContent<Item, Rows: View>: View {
     }
 }
 
+struct ShowOlderRow: View {
+    let isLoading: Bool
+    let failed: Bool
+    let action: () -> Void
+
+    var body: some View {
+        HStack {
+            Spacer()
+            if isLoading {
+                ProgressView().tint(Brand.accent)
+            } else {
+                Button(action: action) {
+                    Text(failed ? "Couldn't load. Try again" : "Show older")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(failed ? .orange : Brand.accent)
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+        }
+        .padding(.vertical, 14)
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+    }
+}
+
 extension View {
     /// Shared dark-themed chrome for a browse list inside a NavigationStack:
     /// the Brand background, an inline title, a Brand-accent Done button, and

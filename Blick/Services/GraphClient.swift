@@ -329,17 +329,20 @@ final class GraphClient {
     /// "browse the inbox" list behind the email screen (as opposed to
     /// `unreadEmails`, which is the triage front). No `$filter` on `isRead`,
     /// so it's the whole recent inbox. Rides `Mail.ReadWrite`, no new scope.
-    func recentInbox(top: Int = 50) async throws -> [Email] {
-        let data: GraphList<EmailResponse> = try await core.get(
-            "/me/mailFolders/inbox/messages",
-            query: [
-                "$orderby": "receivedDateTime desc",
-                "$top": "\(top)",
-                "$select": Self.emailSelect
-            ]
-        )
+    func recentInbox(before: Date? = nil, top: Int = recentPageSize) async throws -> [Email] {
+        var query = [
+            "$orderby": "receivedDateTime desc",
+            "$top": "\(top)",
+            "$select": Self.emailSelect
+        ]
+        if let before {
+            query["$filter"] = "receivedDateTime lt \(before.formatted(.iso8601))"
+        }
+        let data: GraphList<EmailResponse> = try await core.get("/me/mailFolders/inbox/messages", query: query)
         return data.value.map(makeEmail)
     }
+
+    nonisolated static let recentPageSize = 50
 
     /// Map a Graph message envelope into our `Email` model. Shared by the
     /// unread fetch and search so the two never drift on how a message's
@@ -910,11 +913,20 @@ final class GraphClient {
     /// Same display gate as the unread fetch; each chat's read state comes from
     /// the per-user `viewpoint.lastMessageReadDateTime`.
     func recentChats() async throws -> [ChatMessage] {
-        let data: GraphList<ChatResponse> = try await core.get("/me/chats", query: [
-            "$select": "id,topic,webUrl,lastMessagePreview,viewpoint",
-            "$expand": "lastMessagePreview,members",
-            "$top": "50"
-        ])
+        try await recentChatsPage(nil).chats
+    }
+
+    func recentChatsPage(_ nextLink: URL?) async throws -> (chats: [ChatMessage], nextLink: URL?) {
+        let data: GraphList<ChatResponse>
+        if let nextLink {
+            data = try await core.get(nextLink: nextLink)
+        } else {
+            data = try await core.get("/me/chats", query: [
+                "$select": "id,topic,webUrl,lastMessagePreview,viewpoint",
+                "$expand": "lastMessagePreview,members",
+                "$top": "50"
+            ])
+        }
 
         var messages: [ChatMessage] = []
         for chat in data.value {
@@ -929,7 +941,7 @@ final class GraphClient {
             let isRead = !(sent > (lastRead ?? .distantPast))
             messages.append(makeChatMessage(chat, sent: sent, sender: from, isRead: isRead))
         }
-        return messages.sorted { $0.sent > $1.sent }
+        return (messages.sorted { $0.sent > $1.sent }, data.nextLink)
     }
 
     /// Build a `ChatMessage` from a chat, its resolved last-message time and

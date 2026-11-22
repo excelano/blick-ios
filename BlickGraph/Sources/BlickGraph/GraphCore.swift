@@ -52,6 +52,16 @@ public final class GraphCore {
         return try JSONDecoder().decode(T.self, from: data)
     }
 
+    public func get<T: Decodable>(nextLink url: URL) async throws -> T {
+        guard url.absoluteString.hasPrefix(baseURL + "/") else { throw GraphError.invalidURL(path: url.absoluteString) }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request = try await authorize(request)
+        let (data, response) = try await perform(request, retryOnTransient: true)
+        try check(response, data: data, method: "GET", path: url.path)
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
     /// Retry is OFF for `post`. A `POST` may be non-idempotent (send a reply,
     /// post a chat message), and `.networkConnectionLost` can't tell "never
     /// arrived" from "response lost", so double-sending is the worse default.
@@ -174,10 +184,12 @@ public enum GraphError: LocalizedError {
 public struct GraphList<T: Decodable>: Decodable {
     public let value: [T]
     public let count: Int?
+    public let nextLink: URL?
 
     enum CodingKeys: String, CodingKey {
         case value
         case count = "@odata.count"
+        case nextLink = "@odata.nextLink"
     }
 }
 

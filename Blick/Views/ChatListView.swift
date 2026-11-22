@@ -23,6 +23,9 @@ struct ChatListView: View {
     /// when the sheet closes (the preview auto-marks read on the server).
     @State private var openedId: UUID?
     @State private var starredOnly = false
+    @State private var olderLink: URL?
+    @State private var loadingOlder = false
+    @State private var olderFailed = false
 
     private var isStarredFilterActive: Bool {
         starredOnly && !inbox.starredSenders.isEmpty
@@ -63,6 +66,11 @@ struct ChatListView: View {
                         }
                     }
             }
+            if olderLink != nil {
+                ShowOlderRow(isLoading: loadingOlder, failed: olderFailed) {
+                    Task { await loadOlder() }
+                }
+            }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
@@ -71,11 +79,27 @@ struct ChatListView: View {
 
     private func load() async {
         do {
-            chats = try await inbox.recentChats()
+            (chats, olderLink) = try await inbox.recentChats()
             loaded = true
         } catch {
             failed = true
         }
+    }
+
+    private func loadOlder() async {
+        guard let link = olderLink, !loadingOlder else { return }
+        loadingOlder = true
+        olderFailed = false
+        do {
+            let page = try await inbox.recentChats(after: link)
+            let known = Set(chats.compactMap(\.chatId))
+            chats += page.chats.filter { $0.chatId.map { !known.contains($0) } ?? true }
+            chats.sort { $0.sent > $1.sent }
+            olderLink = page.nextLink
+        } catch {
+            olderFailed = true
+        }
+        loadingOlder = false
     }
 
     /// Toggle read/unread: flip the row optimistically, drive Graph through the

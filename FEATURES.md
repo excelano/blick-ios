@@ -82,6 +82,7 @@ What a user can do, mapped to the entry point in the UI.
 | Open the full email list | Email section header → chevron. Opens a full-screen list in its own `NavigationStack`. |
 | Search your whole mailbox | Search field on the full email list. A query runs Graph's `$search` across all folders (read + unread), relevance-ranked, top 25; an empty query shows the recent inbox. Debounced with a generation counter so a slower earlier lookup can't overwrite a newer keystroke's results. |
 | Browse the recent inbox (read + unread) | The full email list shows the recent inbox newest-first, including already-read mail, not just the unread front. Read rows render lighter (open envelope, regular weight). Tap a row to preview; swipe to toggle read/unread or to flag. |
+| Look further back in the inbox | Full email list → "Show older" at the end of the list, offered while the last page came back full. Each tap fetches the next 50 Inbox messages received before the oldest one shown, so the look-back reaches as far as you keep tapping. Not shown during a search. |
 
 ## Teams chats
 
@@ -99,6 +100,7 @@ What a user can do, mapped to the entry point in the UI.
 | Restore today's chats to unread | Inline "Mark unread: today's chats" button under the Chats section header when the section is empty. Fetches today's read chats and batch-flips them via `markChatUnreadForUser`. Registers an undo. |
 | See when a message carries content beyond text | Each message in the preview transcript shows a muted caption ("Image not shown", "Attachment not shown", or both) when it has content the text-only view drops. Inline/pasted images are detected from `<img>` in the body HTML; file attachments are classified as image vs. other by `image/*` contentType or filename extension (Teams tags shared files `reference`, so the extension is the workable signal). An image- or file-only message shows the indicator in place of a misleading "(no message text)". Detection only; rendering the content stays in Teams. |
 | Open the full chat list and browse recent chats | Chats section header → chevron. Opens a full-screen list showing recent chats newest-first, including already-read ones, not just those with unread activity. Tap a row to preview; swipe to toggle read/unread. There is no chat search. |
+| Look further back in your chats | Full chat list → "Show older" at the end of the list, offered while Graph reports another page. Each tap loads the next 50 chats and merges them in newest-first. |
 
 ## Compose
 

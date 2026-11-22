@@ -1902,17 +1902,19 @@ final class Inbox {
     /// The recent inbox (read and unread, newest first) for the browse view,
     /// as opposed to the unread-only triage list on the summary. Transient —
     /// the caller owns the result.
-    func recentInbox() async throws -> [Email] {
+    func recentInbox(before: Date? = nil) async throws -> [Email] {
         #if DEBUG
-        if DemoMode.isActive { return DemoData.browseEmails }
+        if DemoMode.isActive { return before == nil ? DemoData.browseEmails : [] }
         #endif
-        return try await graphClient.recentInbox()
+        return try await graphClient.recentInbox(before: before)
     }
+
+    var recentPageSize: Int { GraphClient.recentPageSize }
 
     /// Recent chats (read and unread, newest first) for the chat browse view,
     /// as opposed to the unread-only list on the summary. Transient.
-    func recentChats() async throws -> [ChatMessage] {
-        try await graphClient.recentChats()
+    func recentChats(after nextLink: URL? = nil) async throws -> (chats: [ChatMessage], nextLink: URL?) {
+        try await graphClient.recentChatsPage(nextLink)
     }
 
     func setEmailReadFromBrowse(_ isRead: Bool, emailId: String, wasUnread: Bool) async throws {

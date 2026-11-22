@@ -39,6 +39,9 @@ struct EmailListView: View {
     /// own picker, since it is a full-screen sheet in its own right.
     @State private var moveTarget: Email?
     @State private var starredOnly = false
+    @State private var hasOlder = false
+    @State private var loadingOlder = false
+    @State private var olderFailed = false
 
     private var isSearchActive: Bool {
         !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -89,10 +92,26 @@ struct EmailListView: View {
     private func loadInbox() async {
         do {
             inboxEmails = try await inbox.recentInbox()
+            hasOlder = inboxEmails.count >= inbox.recentPageSize
             inboxLoaded = true
         } catch {
             inboxFailed = true
         }
+    }
+
+    private func loadOlder() async {
+        guard let oldest = inboxEmails.last?.received, !loadingOlder else { return }
+        loadingOlder = true
+        olderFailed = false
+        do {
+            let page = try await inbox.recentInbox(before: oldest)
+            let known = Set(inboxEmails.map(\.id))
+            inboxEmails += page.filter { !known.contains($0.id) }
+            hasOlder = page.count >= inbox.recentPageSize
+        } catch {
+            olderFailed = true
+        }
+        loadingOlder = false
     }
 
     private func emailList(_ emails: [Email]) -> some View {
@@ -147,6 +166,11 @@ struct EmailListView: View {
                     emailDispositionMenu(for: email, inbox: inbox,
                                          onMove: { moveTarget = $0 },
                                          onDisposed: { dropLocal(email.id) })
+                }
+            }
+            if hasOlder && !isSearchActive {
+                ShowOlderRow(isLoading: loadingOlder, failed: olderFailed) {
+                    Task { await loadOlder() }
                 }
             }
         }
