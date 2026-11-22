@@ -4,6 +4,7 @@
 // Built with AI assistance (Claude, Anthropic)
 
 import AppIntents
+import BlickKit
 import SwiftUI
 
 @main
