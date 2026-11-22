@@ -38,25 +38,37 @@ struct EmailListView: View {
     /// The message the user chose "Move to…" for. This screen presents its
     /// own picker, since it is a full-screen sheet in its own right.
     @State private var moveTarget: Email?
+    @State private var starredOnly = false
 
     private var isSearchActive: Bool {
         !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isStarredFilterActive: Bool {
+        starredOnly && !inbox.starredSenders.isEmpty
+    }
+
+    private func filtered(_ emails: [Email]) -> [Email] {
+        isStarredFilterActive ? emails.filter { inbox.isStarred($0) } : emails
     }
 
     var body: some View {
         NavigationStack {
             Group {
                 if isSearchActive {
-                    BrowseListContent(items: results, isLoading: isSearching, failed: searchFailed,
+                    BrowseListContent(items: filtered(results), isLoading: isSearching, failed: searchFailed,
                                       failedText: "Couldn't search. Check your connection and try again.",
-                                      emptyText: "No messages found.") { emailList($0) }
+                                      emptyText: isStarredFilterActive ? "No messages from starred senders found."
+                                                                       : "No messages found.") { emailList($0) }
                 } else {
-                    BrowseListContent(items: inboxEmails, isLoading: !inboxLoaded, failed: inboxFailed,
+                    BrowseListContent(items: filtered(inboxEmails), isLoading: !inboxLoaded, failed: inboxFailed,
                                       failedText: "Couldn't load your inbox. Check your connection and try again.",
-                                      emptyText: "Your inbox is empty.") { emailList($0) }
+                                      emptyText: isStarredFilterActive ? "No recent mail from starred senders."
+                                                                       : "Your inbox is empty.") { emailList($0) }
                 }
             }
             .browseListChrome(title: "Email", onClose: onClose)
+            .starredFilterToggle($starredOnly, available: !inbox.starredSenders.isEmpty)
         }
         .searchable(text: $query, prompt: "Search all mail")
         .onChange(of: query) { _, newValue in

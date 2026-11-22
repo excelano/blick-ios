@@ -22,13 +22,24 @@ struct ChatListView: View {
     /// The id of the row whose preview is open, so its read state can be synced
     /// when the sheet closes (the preview auto-marks read on the server).
     @State private var openedId: UUID?
+    @State private var starredOnly = false
+
+    private var isStarredFilterActive: Bool {
+        starredOnly && !inbox.starredSenders.isEmpty
+    }
+
+    private var visibleChats: [ChatMessage] {
+        isStarredFilterActive ? chats.filter { inbox.isStarredName($0.from) } : chats
+    }
 
     var body: some View {
         NavigationStack {
-            BrowseListContent(items: chats, isLoading: !loaded, failed: failed,
+            BrowseListContent(items: visibleChats, isLoading: !loaded, failed: failed,
                               failedText: "Couldn't load chats. Check your connection and try again.",
-                              emptyText: "No chats.") { chatList($0) }
+                              emptyText: isStarredFilterActive ? "No recent chats from starred senders."
+                                                               : "No chats.") { chatList($0) }
                 .browseListChrome(title: "Chats", onClose: onClose)
+                .starredFilterToggle($starredOnly, available: !inbox.starredSenders.isEmpty)
         }
         .task { await load() }
         .preferredColorScheme(.dark)
@@ -38,7 +49,7 @@ struct ChatListView: View {
     private func chatList(_ chats: [ChatMessage]) -> some View {
         List {
             ForEach(chats) { chat in
-                ChatRow(chat: chat, onTap: { openedId = chat.id; previewTarget = .chat(chat) })
+                ChatRow(chat: chat, isStarred: inbox.isStarredName(chat.from), onTap: { openedId = chat.id; previewTarget = .chat(chat) })
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))

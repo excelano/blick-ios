@@ -50,8 +50,9 @@ What a user can do, mapped to the entry point in the UI.
 | Lift the 20-email cap to see everything unread | Email section header → ⋯ menu → "Show all N" (only when there are emails beyond the cap). Persists across launches. Toggle back via "Show top 20". |
 | See each email's sender, subject, and preview | Each row shows sender + relative time, subject, and Graph's `bodyPreview` (up to 4 lines) |
 | See a flag indicator on flagged emails | Orange flag icon next to the sender name |
-| See which senders you've starred | Small cyan star after the sender name on any row from a starred sender (summary and full list). |
+| See which senders you've starred | Small cyan star after the sender name on any email or chat row from a starred sender (summary and full lists). |
 | Star or unstar a sender | Long-press an email row → "Star sender" / "Unstar sender" (offered when the message carries an address). Starring your first sender asks for alert permission, since the new-message nudge defaults to starred senders. Manage the set in Settings → Starred senders. |
+| Show only mail and chats from starred senders | Full Email or Chats list → star button at top left. Filters what's already loaded, including mail search results; mail matches on the sender's address, chats on the display name. Shown once anyone is starred, and off each time the list opens. |
 | Preview an email | Tap an email row. Opens a sheet with the full message body, fetched as HTML (`Prefer: outlook.body-content-type="html"`) and rendered by default as cleaned native text (the same Klartext stripper used for summary previews: salutations, signatures, quoted replies, etc.). Email auto-marks-as-read on open. |
 | See an email as formatted HTML or as plain text | Preview sheet → "Web View" / "Text" toggle. "Web View" shows a faithful HTML render of the message; "Text" shows the cleaned native fold. Defaults to text. |
 | Load remote images for a message | Preview sheet (in Web View mode) → "Load images". Remote images are blocked by default and treated as tracking pixels — nothing is fetched from an external host until you opt in, per message. Inline `cid:` images always render. |

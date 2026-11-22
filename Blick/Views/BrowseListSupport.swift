@@ -79,6 +79,21 @@ extension View {
             .toolbarBackground(.visible, for: .navigationBar)
     }
 
+    func starredFilterToggle(_ isOn: Binding<Bool>, available: Bool) -> some View {
+        toolbar {
+            if available {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { isOn.wrappedValue.toggle() } label: {
+                        Image(systemName: isOn.wrappedValue ? "star.fill" : "star")
+                    }
+                    .foregroundStyle(Brand.accent)
+                    .accessibilityLabel("Starred senders only")
+                    .accessibilityAddTraits(isOn.wrappedValue ? .isSelected : [])
+                }
+            }
+        }
+    }
+
     /// Present the shared message preview over a browse list. `onDismiss` lets
     /// the list sync the tapped row's read state once the preview closes.
     func messagePreviewSheet(inbox: Inbox,

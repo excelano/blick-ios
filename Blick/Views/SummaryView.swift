@@ -295,7 +295,7 @@ struct SummaryView: View {
                     }
                 }
                 ForEach(summary.chats) { chat in
-                    ChatRow(chat: chat, onTap: {
+                    ChatRow(chat: chat, isStarred: inbox.isStarredName(chat.from), onTap: {
                         #if DEBUG
                         log.info("chat tap chatId=\(chat.chatId ?? "nil", privacy: .public)")
                         #endif

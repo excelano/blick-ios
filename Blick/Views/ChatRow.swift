@@ -8,6 +8,7 @@ import SwiftUI
 
 struct ChatRow: View {
     let chat: ChatMessage
+    var isStarred: Bool = false
     let onTap: () -> Void
 
     @Environment(\.solarClock) private var solarClock
@@ -19,10 +20,16 @@ struct ChatRow: View {
                     .foregroundStyle(chat.isRead ? Brand.textMuted : Brand.accent)
                     .frame(width: 20)
                 VStack(alignment: .leading, spacing: 3) {
-                    HStack {
+                    HStack(spacing: 6) {
                         Text(chat.from)
                             .font(.subheadline.weight(chat.isRead ? .regular : .semibold))
                             .foregroundStyle(chat.isRead ? Brand.textMuted : .white)
+                        if isStarred {
+                            Image(systemName: "star.fill")
+                                .font(.caption)
+                                .foregroundStyle(Brand.accent)
+                                .accessibilityLabel("Starred sender")
+                        }
                         Spacer()
                         Text(relativeTime(chat.sent, clock: solarClock))
                             .font(.caption)
