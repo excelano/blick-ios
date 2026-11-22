@@ -120,6 +120,7 @@ Blick's composer is one channel-agnostic surface: the channel (email vs Teams ch
 | See a warning for off-organization chat recipients | When a chat recipient's email domain differs from the signed-in user's, an orange inline warning flags it — a warning, not a block, since guests are legitimate. |
 | Forward an email | Forward button in an email's preview sheet, or its long-press menu. Opens the composer in forward mode (To-only plus an optional note); Graph's `/forward` builds the "Fwd:" subject and quotes the original server-side. Leaves the original unread. |
 | Reply across channels | The composer is the single reply surface for both email (reply-all thread semantics) and chat (posts into the thread). An email reply can switch to a Teams chat before sending (email→chat), carrying a one-line `Re: <subject>` reference rather than the full quoted body. Chat replies stay chat-only. |
+| Attach a photo or file to an email | Paperclip in the composer whenever it is sending email (a new email, an email reply, or a forward) → Photo (the system photo picker, sent as JPEG) or File (the Files picker). Each attachment shows as a chip with its size and a remove button; together they can total at most 3 MB, and Send stays off above that. A new email carries them inline in `sendMail`; a reply or forward adds each to the draft before sending. Teams chats do not take attachments: posting a file to a chat needs OneDrive access Blick does not request, so switching to Chat says the text goes alone. No new scope. |
 
 ## Teams presence & status
 

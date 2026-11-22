@@ -2118,11 +2118,11 @@ final class Inbox {
     /// Send a reply-all to an email. After success the email is
     /// optimistically dropped from the visible summary (replying
     /// implies you've handled it) — same shape as markRead's path.
-    func replyAllToEmail(emailId: String, comment: String) async throws {
+    func replyAllToEmail(emailId: String, comment: String, attachments: [OutgoingAttachment] = []) async throws {
         #if DEBUG
         logger.info("replyAllToEmail begin id=\(emailId, privacy: .public)")
         #endif
-        try await graphClient.replyAllToEmail(id: emailId, comment: comment)
+        try await graphClient.replyAllToEmail(id: emailId, comment: comment, attachments: attachments)
         #if DEBUG
         logger.info("replyAllToEmail graph ok id=\(emailId, privacy: .public)")
         #endif
@@ -2151,16 +2151,19 @@ final class Inbox {
     /// originating row, so nothing in the summary changes — a straight
     /// pass-through to Graph. Addresses arrive already validated.
     func sendNewEmail(subject: String, body: String,
-                      to: [String], cc: [String], bcc: [String]) async throws {
-        try await graphClient.sendMail(subject: subject, body: body, to: to, cc: cc, bcc: bcc)
+                      to: [String], cc: [String], bcc: [String],
+                      attachments: [OutgoingAttachment] = []) async throws {
+        try await graphClient.sendMail(subject: subject, body: body, to: to, cc: cc, bcc: bcc,
+                                       attachments: attachments)
     }
 
     /// Forward an email to new recipients with an optional note. The
     /// original message is untouched — forwarding isn't "handling" it, so
     /// (unlike reply) the row stays in the summary and the message stays
     /// unread. Pass-through; a failure surfaces to the caller.
-    func forwardEmail(emailId: String, comment: String, to: [String]) async throws {
-        try await graphClient.forwardEmail(id: emailId, comment: comment, to: to)
+    func forwardEmail(emailId: String, comment: String, to: [String],
+                      attachments: [OutgoingAttachment] = []) async throws {
+        try await graphClient.forwardEmail(id: emailId, comment: comment, to: to, attachments: attachments)
     }
 
     /// Send a reply into an existing Teams chat thread. After success

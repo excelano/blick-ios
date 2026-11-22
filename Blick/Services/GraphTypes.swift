@@ -190,6 +190,7 @@ struct OutgoingMessageBody: Encodable {
     let toRecipients: [OutgoingRecipientBody]
     let ccRecipients: [OutgoingRecipientBody]
     let bccRecipients: [OutgoingRecipientBody]
+    let attachments: [FileAttachmentBody]
 }
 
 /// POST body for `/me/sendMail`. `saveToSentItems` keeps a copy in Sent,
@@ -456,4 +457,29 @@ struct WorkingHoursResponse: Decodable {
 
 struct WorkingHoursTimeZoneResponse: Decodable {
     let name: String?
+}
+
+struct FileAttachmentBody: Encodable {
+    let name: String
+    let contentType: String
+    let contentBytes: String
+
+    init(_ attachment: OutgoingAttachment) {
+        name = attachment.name
+        contentType = attachment.contentType
+        contentBytes = attachment.data.base64EncodedString()
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case odataType = "@odata.type"
+        case name, contentType, contentBytes
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode("#microsoft.graph.fileAttachment", forKey: .odataType)
+        try container.encode(name, forKey: .name)
+        try container.encode(contentType, forKey: .contentType)
+        try container.encode(contentBytes, forKey: .contentBytes)
+    }
 }

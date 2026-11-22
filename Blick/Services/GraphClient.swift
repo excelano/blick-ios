@@ -650,7 +650,7 @@ final class GraphClient {
     /// converting newlines to `<br>` for an HTML draft (the usual case) or
     /// keeping them literal for a plain-text one, and send. Mail.ReadWrite +
     /// Mail.Send required.
-    func replyAllToEmail(id: String, comment: String) async throws {
+    func replyAllToEmail(id: String, comment: String, attachments: [OutgoingAttachment] = []) async throws {
         let draft: DraftMessageResponse = try await core.postDecoded(
             "/me/messages/\(id)/createReplyAll", body: EmptyBody()
         )
@@ -662,7 +662,14 @@ final class GraphClient {
                 contentType: draft.body.contentType,
                 content: prefix + draft.body.content))
         )
+        try await attach(attachments, toDraft: draft.id)
         try await core.post("/me/messages/\(draft.id)/send", body: EmptyBody())
+    }
+
+    private func attach(_ attachments: [OutgoingAttachment], toDraft id: String) async throws {
+        for attachment in attachments {
+            try await core.post("/me/messages/\(id)/attachments", body: FileAttachmentBody(attachment))
+        }
     }
 
     /// Escape a plain-text comment for insertion into an HTML reply body and
@@ -684,13 +691,15 @@ final class GraphClient {
     /// is plain text. `to`/`cc`/`bcc` are already-validated SMTP addresses.
     /// Mail.Send required.
     func sendMail(subject: String, body: String,
-                  to: [String], cc: [String], bcc: [String]) async throws {
+                  to: [String], cc: [String], bcc: [String],
+                  attachments: [OutgoingAttachment] = []) async throws {
         let message = OutgoingMessageBody(
             subject: subject,
             body: OutgoingBodyContent(contentType: "Text", content: body),
             toRecipients: recipientBodies(to),
             ccRecipients: recipientBodies(cc),
-            bccRecipients: recipientBodies(bcc)
+            bccRecipients: recipientBodies(bcc),
+            attachments: attachments.map(FileAttachmentBody.init)
         )
         try await core.post("/me/sendMail", body: SendMailBody(message: message, saveToSentItems: true))
     }
@@ -702,7 +711,8 @@ final class GraphClient {
     /// body (newlines → `<br>` for HTML), then send. The original stays
     /// unread — createForward touches only the new draft. Mail.ReadWrite +
     /// Mail.Send required.
-    func forwardEmail(id: String, comment: String, to: [String]) async throws {
+    func forwardEmail(id: String, comment: String, to: [String],
+                      attachments: [OutgoingAttachment] = []) async throws {
         let draft: DraftMessageResponse = try await core.postDecoded(
             "/me/messages/\(id)/createForward",
             body: CreateForwardBody(toRecipients: recipientBodies(to))
@@ -718,6 +728,7 @@ final class GraphClient {
                     content: prefix + draft.body.content))
             )
         }
+        try await attach(attachments, toDraft: draft.id)
         try await core.post("/me/messages/\(draft.id)/send", body: EmptyBody())
     }
 

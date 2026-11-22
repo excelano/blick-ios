@@ -5,6 +5,7 @@
 
 import BlickGraph
 import BlickKit
+import PhotosUI
 import SwiftUI
 #if DEBUG
 import os
@@ -122,6 +123,10 @@ struct ComposeView: View {
     /// Which recipient field a Contacts pick should fill. Non-nil presents
     /// the picker; `Identifiable` lets it drive `.sheet(item:)` directly.
     @State private var contactPickerField: Field?
+    @State private var attachments: [OutgoingAttachment] = []
+    @State private var showPhotoPicker = false
+    @State private var photoSelection: [PhotosPickerItem] = []
+    @State private var showFileImporter = false
     @FocusState private var focus: Field?
 
     private enum Field: Hashable, Identifiable { case to, cc, bcc, subject, body
@@ -154,6 +159,11 @@ struct ComposeView: View {
                         .padding(.vertical, 8)
                 }
 
+                if attachmentsAllowed || !attachments.isEmpty {
+                    attachmentBar
+                    Divider().overlay(Brand.bgDarker)
+                }
+
                 if let offOrgWarning {
                     Text(offOrgWarning)
                         .font(.footnote)
@@ -180,6 +190,16 @@ struct ComposeView: View {
         }
         .preferredColorScheme(.dark)
         .onAppear { focus = mode.isReply ? .body : .to }
+        .photosPicker(isPresented: $showPhotoPicker, selection: $photoSelection, matching: .images)
+        .onChange(of: photoSelection) { _, items in
+            guard !items.isEmpty else { return }
+            photoSelection = []
+            Task { await addPhotos(items) }
+        }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.item],
+                      allowsMultipleSelection: true) { result in
+            addFiles(result)
+        }
         .background {
             // Presented via UIKit (not a nested .sheet) so the picker's own
             // self-dismiss can't cascade and close the composer. A non-nil
@@ -581,13 +601,124 @@ struct ComposeView: View {
             .padding(.vertical, 10)
     }
 
+    // MARK: Attachments
+
+    private var attachmentsAllowed: Bool {
+        mode.isForward || channel == .email
+    }
+
+    private var attachmentBytes: Int { attachments.reduce(0) { $0 + $1.data.count } }
+
+    private var attachmentsOverLimit: Bool { attachmentBytes > OutgoingAttachment.maxTotalBytes }
+
+    private var attachmentBar: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                if attachmentsAllowed {
+                    Menu {
+                        Button { showPhotoPicker = true } label: { Label("Photo", systemImage: "photo") }
+                        Button { showFileImporter = true } label: { Label("File", systemImage: "doc") }
+                    } label: {
+                        Image(systemName: "paperclip")
+                            .font(.body)
+                            .foregroundStyle(Brand.accent)
+                            .frame(width: 32, height: 32)
+                    }
+                    .accessibilityLabel("Attach")
+                    .disabled(isSending)
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(attachments) { attachment in
+                            attachmentChip(attachment)
+                        }
+                    }
+                }
+            }
+            if let attachmentNotice {
+                Text(attachmentNotice)
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+    }
+
+    private func attachmentChip(_ attachment: OutgoingAttachment) -> some View {
+        HStack(spacing: 6) {
+            Text(attachment.name)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: 160)
+            Text(attachment.sizeLabel)
+                .foregroundStyle(Brand.textMuted)
+            Button {
+                attachments.removeAll { $0.id == attachment.id }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(Brand.textMuted)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove \(attachment.name)")
+            .disabled(isSending)
+        }
+        .font(.caption)
+        .foregroundStyle(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Brand.bgDarker)
+        .clipShape(Capsule())
+    }
+
+    private var attachmentNotice: String? {
+        if !attachmentsAllowed && !attachments.isEmpty {
+            return "Attachments go only by email; a Teams chat sends the text alone."
+        }
+        if attachmentsOverLimit {
+            let limit = ByteCountFormatter.string(fromByteCount: Int64(OutgoingAttachment.maxTotalBytes), countStyle: .file)
+            return "Attachments can total at most \(limit)."
+        }
+        return nil
+    }
+
+    private func addPhotos(_ items: [PhotosPickerItem]) async {
+        for item in items {
+            guard let data = try? await item.loadTransferable(type: Data.self),
+                  let jpeg = UIImage(data: data)?.jpegData(compressionQuality: 0.8) else {
+                errorMessage = "Couldn't add that photo."
+                continue
+            }
+            attachments.append(OutgoingAttachment(name: "Photo \(attachments.count + 1).jpg",
+                                                  contentType: "image/jpeg", data: jpeg))
+        }
+    }
+
+    private func addFiles(_ result: Result<[URL], Error>) {
+        guard case .success(let urls) = result else {
+            errorMessage = "Couldn't add that file."
+            return
+        }
+        for url in urls {
+            do {
+                attachments.append(try OutgoingAttachment(fileURL: url))
+            } catch {
+                errorMessage = "Couldn't read \(url.lastPathComponent)."
+            }
+        }
+    }
+
+    private var outgoingAttachments: [OutgoingAttachment] {
+        attachmentsAllowed ? attachments : []
+    }
+
     // MARK: Send
 
     /// Reply needs a non-empty body (the recipient is the thread); compose and
     /// forward need a recipient (address validation runs in `send()` so the
     /// button doesn't re-parse on every keystroke).
     private var canSend: Bool {
-        guard !isSending else { return false }
+        guard !isSending, !(attachmentsAllowed && attachmentsOverLimit) else { return false }
         if mode.isReply {
             return !bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
@@ -639,7 +770,8 @@ struct ComposeView: View {
                 try await inbox.sendNewEmail(
                     subject: subject.trimmingCharacters(in: .whitespacesAndNewlines),
                     body: bodyText,
-                    to: to.valid, cc: cc.valid, bcc: bcc.valid
+                    to: to.valid, cc: cc.valid, bcc: bcc.valid,
+                    attachments: outgoingAttachments
                 )
             case .forward(let emailId, _):
                 #if DEBUG
@@ -648,7 +780,8 @@ struct ComposeView: View {
                 try await inbox.forwardEmail(
                     emailId: emailId,
                     comment: bodyText,
-                    to: to.valid
+                    to: to.valid,
+                    attachments: outgoingAttachments
                 )
             }
             isSending = false
@@ -680,7 +813,8 @@ struct ComposeView: View {
                     #if DEBUG
                     log.info("reply email: id=\(id, privacy: .public)")
                     #endif
-                    try await inbox.replyAllToEmail(emailId: id, comment: bodyText)
+                    try await inbox.replyAllToEmail(emailId: id, comment: bodyText,
+                                                    attachments: outgoingAttachments)
                 case .chat:
                     guard let id = reply.chatId else { throw GraphError.invalidResponse }
                     #if DEBUG
