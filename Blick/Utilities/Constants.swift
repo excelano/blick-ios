@@ -47,6 +47,7 @@ enum AppStorageKey {
     static let emailNudgeScope = "emailNudgeScope"
     static let chatNudgeScope = "chatNudgeScope"
     static let combinedInbox = "combinedInbox"
+    static let offlineOutsideWorkingHours = "offlineOutsideWorkingHours"
     static let dailyBrief = "dailyBrief"
     static let dailyBriefMinute = "dailyBriefMinute"
     static let dailyBriefWeekdaysOnly = "dailyBriefWeekdaysOnly"

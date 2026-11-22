@@ -43,6 +43,8 @@ final class Inbox {
 
     private(set) var reminders: [String: Date] = [:]
 
+    private(set) var workingHours: WorkingHours?
+
     /// Transient user-facing note, set when an optimistic action reverted
     /// because Graph rejected it (`.error`) or when a bulk action found
     /// nothing to do (`.info`). Drives a floating banner in the summary
@@ -1182,9 +1184,26 @@ final class Inbox {
         }
     }
 
+    func loadWorkingHours() async {
+        do {
+            workingHours = try await graphClient.workingHours()
+        } catch {
+            logger.error("workingHours failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private var workingHoursPresence: Presence? {
+        guard UserDefaults.standard.bool(forKey: AppStorageKey.offlineOutsideWorkingHours),
+              let workingHours, !workingHours.contains(.now) else { return nil }
+        return .offline
+    }
+
     func reconcileAutomaticPresence() async {
         guard teamsEnabled, !isOutOfOffice else { return }
-        let decision = AutomaticPresence.decide(desired: automaticStore.focusPresence,
+        if UserDefaults.standard.bool(forKey: AppStorageKey.offlineOutsideWorkingHours) {
+            await loadWorkingHours()
+        }
+        let decision = AutomaticPresence.decide(desired: automaticStore.focusPresence ?? workingHoursPresence,
                                                 pin: preferredStore.current(),
                                                 automaticExpiry: automaticStore.automaticExpiry)
         switch decision {

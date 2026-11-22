@@ -20,6 +20,7 @@ struct SettingsView: View {
     @AppStorage(AppStorageKey.emailNudgeScope) private var emailNudge: NudgeScope = .default
     @AppStorage(AppStorageKey.chatNudgeScope) private var chatNudge: NudgeScope = .default
     @AppStorage(AppStorageKey.combinedInbox) private var combinedInbox = false
+    @AppStorage(AppStorageKey.offlineOutsideWorkingHours) private var offlineOutsideWorkingHours = false
     @AppStorage(AppStorageKey.dailyBrief) private var dailyBrief = false
     @AppStorage(AppStorageKey.dailyBriefMinute) private var dailyBriefMinute = Inbox.defaultDailyBriefMinute
     @AppStorage(AppStorageKey.dailyBriefWeekdaysOnly) private var dailyBriefWeekdaysOnly = true
@@ -43,6 +44,9 @@ struct SettingsView: View {
                 dailyBriefSection
                 starredSendersSection
                 layoutSection
+                if authService.isAuthenticated && Constants.teamsEnabled {
+                    workingHoursSection
+                }
                 bogenzeitSection
                 if authService.isAuthenticated {
                     WatchSignInSection()
@@ -189,6 +193,24 @@ struct SettingsView: View {
             dailyBriefMinute = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
             Task { await inbox.rescheduleDailyBrief() }
         }
+    }
+
+    private var workingHoursSection: some View {
+        Section {
+            Toggle("Offline outside working hours", isOn: $offlineOutsideWorkingHours)
+                .tint(Brand.accent)
+                .listRowBackground(Brand.bgDarker)
+                .onChange(of: offlineOutsideWorkingHours) { Task { await inbox.reconcileAutomaticPresence() } }
+        } footer: {
+            Text(workingHoursFooter)
+        }
+        .task { await inbox.loadWorkingHours() }
+    }
+
+    private var workingHoursFooter: String {
+        let hours = inbox.workingHours.map { "Your Outlook working hours: \($0.summary())." } ?? ""
+        return "\(hours) Blick shows you Offline outside them and releases it when they start, checking on each refresh, so a change can lag by up to an hour while Blick is closed. A status you pick yourself and a Focus both take precedence. Outlook reports its default hours for a mailbox that never set any, so check them in Outlook's calendar settings."
+            .trimmingCharacters(in: .whitespaces)
     }
 
     private var layoutSection: some View {

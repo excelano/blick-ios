@@ -228,6 +228,12 @@ final class GraphClient {
     /// Accept/tentative/decline an event. Graph returns 202 with no body.
     /// `sendResponse: true` matches Outlook's default behavior — the
     /// organizer's tracking is updated.
+    func workingHours() async throws -> WorkingHours? {
+        let data: WorkingHoursResponse = try await core.get("/me/mailboxSettings/workingHours")
+        guard let days = data.daysOfWeek, let start = data.startTime, let end = data.endTime else { return nil }
+        return WorkingHours(graphDays: days, startTime: start, endTime: end, windowsTimeZone: data.timeZone?.name)
+    }
+
     func createMeeting(subject: String, notes: String, start: Date, end: Date,
                        attendees: [String], teams: Bool) async throws -> String {
         let body = CreateEventBody(

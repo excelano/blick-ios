@@ -446,3 +446,14 @@ struct ScheduleErrorResponse: Decodable {
     let message: String?
     let responseCode: String?
 }
+
+struct WorkingHoursResponse: Decodable {
+    let daysOfWeek: [String]?
+    let startTime: String?
+    let endTime: String?
+    let timeZone: WorkingHoursTimeZoneResponse?
+}
+
+struct WorkingHoursTimeZoneResponse: Decodable {
+    let name: String?
+}
