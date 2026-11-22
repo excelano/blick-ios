@@ -24,6 +24,7 @@ struct SummaryView: View {
     /// The week agenda, opened by tapping the "Later today" header.
     @State private var showAgenda = false
     @State private var showNewMeeting = false
+    @AppStorage(AppStorageKey.combinedInbox) private var combinedInbox = false
     /// The message the user chose "Move to…" for, driving the folder picker.
     @State private var moveTarget: Email?
     /// The email a context-menu "Forward" targets. Drives a forward-mode
@@ -319,103 +320,155 @@ struct SummaryView: View {
                     .accessibilityLabel("New meeting")
                 }
             }
-            Section {
-                if summary.chats.isEmpty {
-                    emptyStateButton(label: "Mark unread: today's chats",
-                                     icon: "bubble.left.fill",
-                                     isBusy: inbox.activeBulkActivity == .todaysChats) {
-                        Task { await inbox.markTodayChatsUnread() }
+            if combinedInbox {
+                combinedSection(summary: summary, senderCounts: senderCounts, subjectCounts: subjectCounts)
+            } else {
+                Section {
+                    if summary.chats.isEmpty {
+                        emptyStateButton(label: "Mark unread: today's chats",
+                                         icon: "bubble.left.fill",
+                                         isBusy: inbox.activeBulkActivity == .todaysChats) {
+                            Task { await inbox.markTodayChatsUnread() }
+                        }
+                    }
+                    ForEach(summary.chats) { chat in
+                        chatRow(chat)
+                    }
+                } header: {
+                    sectionHeader(title: "Chats", count: summary.chats.count,
+                                  onOpen: { showChatList = true }) {
+                        presenceControls
                     }
                 }
-                ForEach(summary.chats) { chat in
-                    chatRow(chat)
-                }
-            } header: {
-                sectionHeader(title: "Chats", count: summary.chats.count,
-                              onOpen: { showChatList = true }) {
-                    HStack(spacing: 8) {
-                        Button {
-                            showCustomMessageSheet = true
-                        } label: {
-                            Text(inbox.customStatusMessage.isEmpty
-                                ? "Set message…"
-                                : inbox.customStatusMessage)
-                                .font(.caption.italic())
-                                .foregroundStyle(Brand.textMuted)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
+                let extras = summary.totalUnreadEmails - summary.emails.count
+                Section {
+                    if summary.emails.isEmpty {
+                        emptyStateButton(label: "Mark unread: today's emails",
+                                         icon: "envelope.badge",
+                                         isBusy: inbox.activeBulkActivity == .todaysEmails) {
+                            Task { await inbox.markTodayUnread() }
                         }
-                        .accessibilityLabel(inbox.customStatusMessage.isEmpty
-                            ? "Set custom status message"
-                            : "Custom status message: \(inbox.customStatusMessage)")
-                        .accessibilityHint("Tap to edit")
-                        PresenceMenu(
-                            presence: inbox.currentPresence,
-                            isOutOfOffice: inbox.isOutOfOffice,
-                            onSelect: { selection in
-                                Task { await inbox.setPresence(selection) }
+                    }
+                    ForEach(summary.emails) { email in
+                        emailRow(email,
+                                 senderCount: email.fromAddress.isEmpty ? 0 : senderCounts[email.fromAddress, default: 0],
+                                 subjectCount: subjectCounts[email.subject.normalizedSubjectKey, default: 0])
+                    }
+                    } header: {
+                        sectionHeader(
+                            title: "Email",
+                            count: summary.emails.count,
+                            onOpen: { showEmailList = true },
+                            subtitle: {
+                                if extras > 0 {
+                                    Text("+ \(extras) more unread")
+                                        .font(.footnote)
+                                        .foregroundStyle(Brand.textMuted)
+                                }
                             },
-                            onSelectOutOfOffice: {
-                                Task { await inbox.setOutOfOffice(!inbox.isOutOfOffice) }
+                            trailing: {
+                                bulkActionsMenu(summary)
                             }
                         )
                     }
-                }
             }
-            let extras = summary.totalUnreadEmails - summary.emails.count
-            Section {
-                if summary.emails.isEmpty {
-                    emptyStateButton(label: "Mark unread: today's emails",
-                                     icon: "envelope.badge",
-                                     isBusy: inbox.activeBulkActivity == .todaysEmails) {
-                        Task { await inbox.markTodayUnread() }
-                    }
-                }
-                ForEach(summary.emails) { email in
-                    emailRow(email,
-                             senderCount: email.fromAddress.isEmpty ? 0 : senderCounts[email.fromAddress, default: 0],
-                             subjectCount: subjectCounts[email.subject.normalizedSubjectKey, default: 0])
-                }
-                } header: {
-                    sectionHeader(
-                        title: "Email",
-                        count: summary.emails.count,
-                        onOpen: { showEmailList = true },
-                        subtitle: {
-                            if extras > 0 {
-                                Text("+ \(extras) more unread")
-                                    .font(.footnote)
-                                    .foregroundStyle(Brand.textMuted)
-                            }
-                        },
-                        trailing: {
-                            BulkActionsMenu(
-                                emails: summary.emails,
-                                totalUnread: summary.totalUnreadEmails,
-                                isShowingAll: inbox.showingAllEmails,
-                                userMailDomain: inbox.userMailDomain,
-                                isBusy: inbox.activeBulkActivity == .todaysEmails
-                                    || inbox.activeBulkActivity == .flaggedEmails,
-                                onMarkAllRead: { Task { await inbox.markAllVisibleRead() } },
-                                onMarkOtherRead: { Task { await inbox.markOtherInboxRead() } },
-                                onMarkMeetingNoticesRead: { Task { await inbox.markMeetingNoticesRead() } },
-                                onMarkMailingListsRead: { Task { await inbox.markMailingListsRead() } },
-                                onMarkExternalRead: { Task { await inbox.markExternalSendersRead() } },
-                                onFlagAll: { Task { await inbox.setFlaggedAllVisible(true) } },
-                                onUnflagAll: { Task { await inbox.setFlaggedAllVisible(false) } },
-                                onShowAll: { Task { await inbox.setShowingAllEmails(true) } },
-                                onShowCapped: { Task { await inbox.setShowingAllEmails(false) } },
-                                onMarkTodayUnread: { Task { await inbox.markTodayUnread() } },
-                                onMarkFlaggedUnread: { Task { await inbox.markFlaggedUnread() } }
-                            )
-                        }
-                    )
-                }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Brand.bg)
         .refreshable { await inbox.refresh() }
+    }
+
+    private var presenceControls: some View {
+        HStack(spacing: 8) {
+            Button {
+                showCustomMessageSheet = true
+            } label: {
+                Text(inbox.customStatusMessage.isEmpty
+                    ? "Set message…"
+                    : inbox.customStatusMessage)
+                    .font(.caption.italic())
+                    .foregroundStyle(Brand.textMuted)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .accessibilityLabel(inbox.customStatusMessage.isEmpty
+                ? "Set custom status message"
+                : "Custom status message: \(inbox.customStatusMessage)")
+            .accessibilityHint("Tap to edit")
+            PresenceMenu(
+                presence: inbox.currentPresence,
+                isOutOfOffice: inbox.isOutOfOffice,
+                onSelect: { selection in
+                    Task { await inbox.setPresence(selection) }
+                },
+                onSelectOutOfOffice: {
+                    Task { await inbox.setOutOfOffice(!inbox.isOutOfOffice) }
+                }
+            )
+        }
+    }
+
+    private func bulkActionsMenu(_ summary: BlickSummary) -> some View {
+        BulkActionsMenu(
+            emails: summary.emails,
+            totalUnread: summary.totalUnreadEmails,
+            isShowingAll: inbox.showingAllEmails,
+            userMailDomain: inbox.userMailDomain,
+            isBusy: inbox.activeBulkActivity == .todaysEmails
+                || inbox.activeBulkActivity == .flaggedEmails,
+            onMarkAllRead: { Task { await inbox.markAllVisibleRead() } },
+            onMarkOtherRead: { Task { await inbox.markOtherInboxRead() } },
+            onMarkMeetingNoticesRead: { Task { await inbox.markMeetingNoticesRead() } },
+            onMarkMailingListsRead: { Task { await inbox.markMailingListsRead() } },
+            onMarkExternalRead: { Task { await inbox.markExternalSendersRead() } },
+            onFlagAll: { Task { await inbox.setFlaggedAllVisible(true) } },
+            onUnflagAll: { Task { await inbox.setFlaggedAllVisible(false) } },
+            onShowAll: { Task { await inbox.setShowingAllEmails(true) } },
+            onShowCapped: { Task { await inbox.setShowingAllEmails(false) } },
+            onMarkTodayUnread: { Task { await inbox.markTodayUnread() } },
+            onMarkFlaggedUnread: { Task { await inbox.markFlaggedUnread() } }
+        )
+    }
+
+    @ViewBuilder
+    private func combinedSection(summary: BlickSummary, senderCounts: [String: Int],
+                                 subjectCounts: [String: Int]) -> some View {
+        let items = InboxItem.merged(emails: summary.emails, chats: summary.chats)
+        Section {
+            if items.isEmpty {
+                emptyStateButton(label: "Mark unread: today's emails",
+                                 icon: "envelope.badge",
+                                 isBusy: inbox.activeBulkActivity == .todaysEmails) {
+                    Task { await inbox.markTodayUnread() }
+                }
+            }
+            ForEach(items) { item in
+                switch item {
+                case .chat(let chat):
+                    chatRow(chat)
+                case .email(let email):
+                    emailRow(email,
+                             senderCount: email.fromAddress.isEmpty ? 0 : senderCounts[email.fromAddress, default: 0],
+                             subjectCount: subjectCounts[email.subject.normalizedSubjectKey, default: 0])
+                }
+            }
+        } header: {
+            HStack {
+                Menu {
+                    Button { showEmailList = true } label: { Label("All email", systemImage: "envelope") }
+                    Button { showChatList = true } label: { Label("All chats", systemImage: "bubble.left") }
+                } label: {
+                    titleCluster(title: "Inbox", count: items.count, tappable: true)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Open the full email or chat list")
+                Spacer(minLength: 8)
+                presenceControls
+                bulkActionsMenu(summary)
+            }
+            .transaction { $0.animation = nil }
+        }
     }
 
     @ViewBuilder

@@ -19,6 +19,7 @@ struct SettingsView: View {
     @AppStorage(AppStorageKey.meetingNotifications) private var meetingNotificationsEnabled: Bool = false
     @AppStorage(AppStorageKey.emailNudgeScope) private var emailNudge: NudgeScope = .default
     @AppStorage(AppStorageKey.chatNudgeScope) private var chatNudge: NudgeScope = .default
+    @AppStorage(AppStorageKey.combinedInbox) private var combinedInbox = false
     @AppStorage(AppStorageKey.bogenzeit) private var bogenzeit = false
     @AppStorage(AppStorageKey.bogenzeitScale) private var bogenzeitScale = Scale.standard.rawValue
     @AppStorage(AppStorageKey.bogenzeitPrecision) private var bogenzeitPrecision = Precision.standard.rawValue
@@ -37,6 +38,7 @@ struct SettingsView: View {
             Form {
                 notificationsSection
                 starredSendersSection
+                layoutSection
                 bogenzeitSection
                 if authService.isAuthenticated {
                     WatchSignInSection()
@@ -144,6 +146,16 @@ struct SettingsView: View {
             .listRowBackground(Brand.bgDarker)
         } footer: {
             Text("The people whose mail you never want to miss. Long-press a message to star its sender, or add someone from Contacts. New-message notifications can be limited to starred senders.")
+        }
+    }
+
+    private var layoutSection: some View {
+        Section {
+            Toggle("Mail and chats in one list", isOn: $combinedInbox)
+                .tint(Brand.accent)
+                .listRowBackground(Brand.bgDarker)
+        } footer: {
+            Text("Shows unread email and chats together, newest first, in a single Inbox section in place of the separate Chats and Email sections.")
         }
     }
 

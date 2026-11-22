@@ -46,6 +46,7 @@ enum AppStorageKey {
     /// Per-channel `NudgeScope` raw values. Unset reads as the default.
     static let emailNudgeScope = "emailNudgeScope"
     static let chatNudgeScope = "chatNudgeScope"
+    static let combinedInbox = "combinedInbox"
     static let bogenzeit = "bogenzeit"
     static let bogenzeitScale = "bogenzeitScale"
     static let bogenzeitPrecision = "bogenzeitPrecision"
