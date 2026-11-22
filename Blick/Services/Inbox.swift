@@ -1200,6 +1200,7 @@ final class Inbox {
 
     func reconcileAutomaticPresence() async {
         guard teamsEnabled, !isOutOfOffice else { return }
+        await adoptActiveFocusFilter()
         if UserDefaults.standard.bool(forKey: AppStorageKey.offlineOutsideWorkingHours) {
             await loadWorkingHours()
         }
@@ -1217,6 +1218,16 @@ final class Inbox {
             automaticStore.setAutomaticExpiry(nil)
             await setPresence(.unknown)
         }
+        BlickSnapshot.patchAndReload(presence: currentPresence, isOutOfOffice: isOutOfOffice)
+        phoneConnectivity?.pushFromAppGroup()
+    }
+
+    private func adoptActiveFocusFilter() async {
+        do {
+            automaticStore.setFocusPresence(try await PresenceFocusFilter.activePresence())
+        } catch {
+            logger.error("Focus filter lookup failed: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     func applyFocusPresence(_ presence: Presence?) async throws {
@@ -1225,8 +1236,6 @@ final class Inbox {
         _ = try await authService.acquireTokenSilentlyNoInteraction(enableTeams: teamsEnabled)
         isOutOfOffice = await fetchOutOfOffice()
         await reconcileAutomaticPresence()
-        BlickSnapshot.patchAndReload(presence: currentPresence, isOutOfOffice: isOutOfOffice)
-        phoneConnectivity?.pushFromAppGroup()
     }
 
     /// Enable auto-replies (`alwaysEnabled` with no end date). Optimistic

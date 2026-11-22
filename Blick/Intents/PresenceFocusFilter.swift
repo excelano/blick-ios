@@ -22,8 +22,16 @@ struct PresenceFocusFilter: SetFocusFilterIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        let presence = status?.asPresence
-        try await inbox.applyFocusPresence(presence == .unknown ? nil : presence)
+        try await inbox.applyFocusPresence(Self.presence(for: status))
         return .result()
+    }
+
+    static func presence(for status: StatusAppEnum?) -> Presence? {
+        guard let presence = status?.asPresence, presence != .unknown else { return nil }
+        return presence
+    }
+
+    static func activePresence() async throws -> Presence? {
+        presence(for: try await current.status)
     }
 }
