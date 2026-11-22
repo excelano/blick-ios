@@ -153,6 +153,7 @@ final class Inbox {
     private let meetingNotifications = MeetingNotifications()
     private let messageNotifications = MessageNotifications()
     private let emailReminders = EmailReminders()
+    private let dailyBriefNotification = DailyBriefNotification()
     private let newMessageTracker = NewMessageTracker()
 
     /// Whether the app is in front of the user right now. The app wires this
@@ -328,6 +329,7 @@ final class Inbox {
         await updateAppBadge()
         await rescheduleMeetingNotificationsIfEnabled()
         await reloadReminders()
+        await rescheduleDailyBrief()
         publishStatusSnapshot()
     }
 
@@ -994,6 +996,41 @@ final class Inbox {
     /// the setting off.
     func disableMeetingNotifications() async {
         await meetingNotifications.clearAll()
+    }
+
+    // MARK: - Daily brief
+
+    nonisolated static let defaultDailyBriefMinute = 7 * 60 + 30
+
+    func rescheduleDailyBrief() async {
+        let defaults = UserDefaults.standard
+        dailyBriefNotification.clear()
+        guard defaults.bool(forKey: AppStorageKey.dailyBrief), let summary else { return }
+        let minute = defaults.object(forKey: AppStorageKey.dailyBriefMinute) as? Int ?? Self.defaultDailyBriefMinute
+        let weekdaysOnly = defaults.object(forKey: AppStorageKey.dailyBriefWeekdaysOnly) as? Bool ?? true
+        let calendar = Calendar.current
+        guard let fire = DailyBrief.nextFireDate(after: .now, minuteOfDay: minute, weekdaysOnly: weekdaysOnly),
+              let dayEnd = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: fire)) else { return }
+        let meetings: [Meeting]
+        do {
+            meetings = try await graphClient.eventsInRange(start: fire, end: dayEnd)
+        } catch {
+            logger.error("daily brief meetings failed: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+        let brief = DailyBrief.compose(
+            meetings: meetings.filter { $0.start >= fire }.map { .init(subject: $0.subject, start: $0.start) },
+            unreadEmails: summary.totalUnreadEmails,
+            unreadChats: summary.chats.count,
+            timeStyle: { $0.formatted(date: .omitted, time: .shortened) }
+        )
+        await dailyBriefNotification.schedule(brief, at: fire)
+    }
+
+    func enableDailyBrief() async -> Bool {
+        let granted = await NotificationAuthorization.request()
+        if granted { await rescheduleDailyBrief() }
+        return granted
     }
 
     // MARK: - New-message nudge

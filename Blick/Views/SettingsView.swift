@@ -20,6 +20,9 @@ struct SettingsView: View {
     @AppStorage(AppStorageKey.emailNudgeScope) private var emailNudge: NudgeScope = .default
     @AppStorage(AppStorageKey.chatNudgeScope) private var chatNudge: NudgeScope = .default
     @AppStorage(AppStorageKey.combinedInbox) private var combinedInbox = false
+    @AppStorage(AppStorageKey.dailyBrief) private var dailyBrief = false
+    @AppStorage(AppStorageKey.dailyBriefMinute) private var dailyBriefMinute = Inbox.defaultDailyBriefMinute
+    @AppStorage(AppStorageKey.dailyBriefWeekdaysOnly) private var dailyBriefWeekdaysOnly = true
     @AppStorage(AppStorageKey.bogenzeit) private var bogenzeit = false
     @AppStorage(AppStorageKey.bogenzeitScale) private var bogenzeitScale = Scale.standard.rawValue
     @AppStorage(AppStorageKey.bogenzeitPrecision) private var bogenzeitPrecision = Precision.standard.rawValue
@@ -37,6 +40,7 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 notificationsSection
+                dailyBriefSection
                 starredSendersSection
                 layoutSection
                 bogenzeitSection
@@ -146,6 +150,44 @@ struct SettingsView: View {
             .listRowBackground(Brand.bgDarker)
         } footer: {
             Text("The people whose mail you never want to miss. Long-press a message to star its sender, or add someone from Contacts. New-message notifications can be limited to starred senders.")
+        }
+    }
+
+    private var dailyBriefSection: some View {
+        Section {
+            Toggle("Morning brief", isOn: $dailyBrief)
+                .tint(Brand.accent)
+                .listRowBackground(Brand.bgDarker)
+                .onChange(of: dailyBrief) { _, newValue in
+                    Task {
+                        if newValue {
+                            if !(await inbox.enableDailyBrief()) { dailyBrief = false }
+                        } else {
+                            await inbox.rescheduleDailyBrief()
+                        }
+                    }
+                }
+            if dailyBrief {
+                DatePicker("Time", selection: dailyBriefTime, displayedComponents: .hourAndMinute)
+                    .listRowBackground(Brand.bgDarker)
+                Toggle("Weekdays only", isOn: $dailyBriefWeekdaysOnly)
+                    .tint(Brand.accent)
+                    .listRowBackground(Brand.bgDarker)
+                    .onChange(of: dailyBriefWeekdaysOnly) { Task { await inbox.rescheduleDailyBrief() } }
+            }
+        } footer: {
+            Text("One notification a day with your first meeting, how many meetings the day holds, and your unread email and chat counts. It is written at Blick's last refresh before that time, so the counts can trail what arrived since.")
+        }
+    }
+
+    private var dailyBriefTime: Binding<Date> {
+        Binding {
+            Calendar.current.date(bySettingHour: dailyBriefMinute / 60, minute: dailyBriefMinute % 60,
+                                  second: 0, of: .now) ?? .now
+        } set: { date in
+            let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+            dailyBriefMinute = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+            Task { await inbox.rescheduleDailyBrief() }
         }
     }
 
