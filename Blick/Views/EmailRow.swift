@@ -25,6 +25,8 @@ struct EmailRow: View {
     /// the "Later today" rows.
     let onConflictTap: () -> Void
 
+    @Environment(\.solarClock) private var solarClock
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Content area: previewable email body. Uses .onTapGesture
@@ -53,7 +55,7 @@ struct EmailRow: View {
                                 .accessibilityLabel("Flagged")
                         }
                         Spacer()
-                        Text(relativeTime(email.received))
+                        Text(relativeTime(email.received, clock: solarClock))
                             .font(.caption)
                             .foregroundStyle(Brand.textMuted)
                     }

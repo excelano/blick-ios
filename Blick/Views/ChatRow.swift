@@ -10,6 +10,8 @@ struct ChatRow: View {
     let chat: ChatMessage
     let onTap: () -> Void
 
+    @Environment(\.solarClock) private var solarClock
+
     var body: some View {
         Button(action: onTap) {
             HStack(alignment: .top, spacing: 12) {
@@ -22,7 +24,7 @@ struct ChatRow: View {
                             .font(.subheadline.weight(chat.isRead ? .regular : .semibold))
                             .foregroundStyle(chat.isRead ? Brand.textMuted : .white)
                         Spacer()
-                        Text(relativeTime(chat.sent))
+                        Text(relativeTime(chat.sent, clock: solarClock))
                             .font(.caption)
                             .foregroundStyle(Brand.textMuted)
                     }

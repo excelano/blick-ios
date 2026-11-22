@@ -6,10 +6,10 @@
 import Foundation
 import BlickKit
 
-func relativeTime(_ date: Date) -> String {
+func relativeTime(_ date: Date, clock: SolarClock?) -> String {
     let now = Date.now
     let seconds = now.timeIntervalSince(date)
-    if seconds >= 60, seconds < 86400, let clock = SolarClock.current {
+    if seconds >= 60, seconds < 86400, let clock {
         return clock.elapsed(since: date, now: now)
     }
 

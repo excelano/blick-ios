@@ -5,20 +5,6 @@ import Bogenzeit
 import BlickKit
 import SwiftUI
 
-extension SolarClock {
-    static var current: SolarClock? {
-        let defaults = UserDefaults.standard
-        return SolarClock(
-            enabled: defaults.bool(forKey: AppStorageKey.bogenzeit),
-            latitude: defaults.object(forKey: AppStorageKey.bogenzeitLatitude) as? Double,
-            longitude: defaults.object(forKey: AppStorageKey.bogenzeitLongitude) as? Double,
-            scale: defaults.string(forKey: AppStorageKey.bogenzeitScale) ?? Scale.standard.rawValue,
-            precision: defaults.object(forKey: AppStorageKey.bogenzeitPrecision) as? Int ?? Precision.standard.rawValue,
-            hidesCivilTime: defaults.bool(forKey: AppStorageKey.bogenzeitHidesCivilTime)
-        )
-    }
-}
-
 struct SolarClockSource: ViewModifier {
     let publish: @MainActor (SolarClock?) -> Void
 

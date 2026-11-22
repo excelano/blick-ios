@@ -52,6 +52,8 @@ struct MessagePreviewSheet: View {
     /// silently did nothing in the split-view detail context.
     let onClose: () -> Void
 
+    @Environment(\.solarClock) private var solarClock
+
     @State private var showingComposer = false
     /// Presents the forward composer over the preview. Email-only; the
     /// original stays unread, so the preview underneath is left intact.
@@ -397,7 +399,7 @@ struct MessagePreviewSheet: View {
                         .font(.subheadline)
                         .foregroundStyle(Brand.accent)
                     Spacer(minLength: 8)
-                    Text(relativeTime(email.received))
+                    Text(relativeTime(email.received, clock: solarClock))
                         .font(.caption)
                         .foregroundStyle(Brand.textMuted)
                 }
@@ -711,7 +713,7 @@ struct MessagePreviewSheet: View {
                     Text(message.isFromMe ? "You" : message.from)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(message.isFromMe ? Brand.accent : Brand.textMuted)
-                    Text(relativeTime(message.sent))
+                    Text(relativeTime(message.sent, clock: solarClock))
                         .font(.caption2)
                         .foregroundStyle(Brand.textMuted)
                 }
