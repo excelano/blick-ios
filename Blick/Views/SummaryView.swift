@@ -328,55 +328,7 @@ struct SummaryView: View {
                     }
                 }
                 ForEach(summary.chats) { chat in
-                    ChatRow(chat: chat, isStarred: inbox.isStarredName(chat.from), onTap: {
-                        #if DEBUG
-                        log.info("chat tap chatId=\(chat.chatId ?? "nil", privacy: .public)")
-                        #endif
-                        previewTarget = .chat(chat)
-                    })
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            if chat.chatId != nil {
-                                Button {
-                                    Task { await inbox.markChatRead(chat) }
-                                } label: {
-                                    Label("Mark Read", systemImage: "checkmark.bubble")
-                                }
-                                .tint(.green)
-                            }
-                        }
-                        .contextMenu {
-                            if chat.chatId != nil {
-                                Button {
-                                    previewTarget = .chat(chat, openComposer: true)
-                                } label: {
-                                    Label("Reply", systemImage: "arrowshape.turn.up.left")
-                                }
-                                Button {
-                                    Task { await inbox.markChatRead(chat) }
-                                } label: {
-                                    Label("Mark read", systemImage: "checkmark.bubble")
-                                }
-                            }
-                            if let url = chat.webUrl {
-                                // Divider only when there's actual content
-                                // above it — otherwise a webUrl-only chat
-                                // would render with a leading separator.
-                                if chat.chatId != nil { Divider() }
-                                Button {
-                                    UIPasteboard.general.string = url
-                                } label: {
-                                    Label("Copy chat link", systemImage: "doc.on.doc")
-                                }
-                                Button {
-                                    openChat(chat)
-                                } label: {
-                                    Label("Open in Teams", systemImage: "arrow.up.forward.app")
-                                }
-                            }
-                        }
+                    chatRow(chat)
                 }
             } header: {
                 sectionHeader(title: "Chats", count: summary.chats.count,
@@ -420,117 +372,10 @@ struct SummaryView: View {
                     }
                 }
                 ForEach(summary.emails) { email in
-                        let senderCount = email.fromAddress.isEmpty
-                            ? 0
-                            : senderCounts[email.fromAddress, default: 0]
-                        let subjectCount = subjectCounts[email.subject.normalizedSubjectKey, default: 0]
-                        // Look up the meeting only for actionable invites —
-                        // skips the search for the common non-invite case.
-                        let matchingMeeting = email.isInvite ? inbox.meetingMatching(email) : nil
-                        EmailRow(
-                            email: email,
-                            isStarred: inbox.isStarred(email),
-                            reminder: inbox.reminders[email.id],
-                            matchingMeeting: matchingMeeting,
-                            onTap: {
-                                #if DEBUG
-                                log.info("email tap id=\(email.id, privacy: .public)")
-                                #endif
-                                previewTarget = .email(email)
-                            },
-                            onRsvp: { response in
-                                if let id = matchingMeeting?.id {
-                                    Task { await inbox.respondToMeeting(response, meetingId: id) }
-                                }
-                            },
-                            onConflictTap: {
-                                if let m = matchingMeeting { conflictTarget = m }
-                            }
-                        )
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button {
-                                    Task { await inbox.markRead(emailId: email.id) }
-                                } label: {
-                                    Label("Mark Read", systemImage: "envelope.open")
-                                }
-                                .tint(.green)
-                            }
-                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                Button {
-                                    Task { await inbox.setFlagged(!email.isFlagged, emailId: email.id) }
-                                } label: {
-                                    Label(email.isFlagged ? "Unflag" : "Flag",
-                                          systemImage: email.isFlagged ? "flag.slash" : "flag")
-                                }
-                                .tint(.orange)
-                            }
-                            .contextMenu {
-                                Button {
-                                    previewTarget = .email(email, openComposer: true)
-                                } label: {
-                                    Label("Reply", systemImage: "arrowshape.turn.up.left")
-                                }
-                                Button {
-                                    forwardEmail = email
-                                } label: {
-                                    Label("Forward", systemImage: "arrowshape.turn.up.right")
-                                }
-                                Button {
-                                    Task { await inbox.markRead(emailId: email.id) }
-                                } label: {
-                                    Label("Mark read", systemImage: "envelope.open")
-                                }
-                                if senderCount > 1 {
-                                    Button {
-                                        Task { await inbox.markAllFromSenderRead(email.fromAddress) }
-                                    } label: {
-                                        Label("Mark read: \(senderCount) from this sender",
-                                              systemImage: "envelope.open")
-                                    }
-                                }
-                                if subjectCount > 1 {
-                                    Button {
-                                        Task { await inbox.markAllWithSubjectRead(email.subject) }
-                                    } label: {
-                                        Label("Mark read: \(subjectCount) with this subject",
-                                              systemImage: "envelope.open")
-                                    }
-                                }
-                                Button {
-                                    Task { await inbox.setFlagged(!email.isFlagged, emailId: email.id) }
-                                } label: {
-                                    Label(email.isFlagged ? "Unflag" : "Flag",
-                                          systemImage: email.isFlagged ? "flag.slash" : "flag")
-                                }
-                                if !email.fromAddress.isEmpty {
-                                    Button {
-                                        if inbox.isStarred(email) {
-                                            inbox.unstar(address: email.fromAddress)
-                                        } else {
-                                            inbox.star(email)
-                                        }
-                                    } label: {
-                                        Label(inbox.isStarred(email) ? "Unstar sender" : "Star sender",
-                                              systemImage: inbox.isStarred(email) ? "star.slash" : "star")
-                                    }
-                                }
-                                emailReminderMenu(for: email, inbox: inbox)
-                                Divider()
-                                emailDispositionMenu(for: email, inbox: inbox,
-                                                     onMove: { moveTarget = $0 })
-                                if !email.fromAddress.isEmpty {
-                                    Divider()
-                                    Button {
-                                        UIPasteboard.general.string = email.fromAddress
-                                    } label: {
-                                        Label("Copy sender address", systemImage: "doc.on.doc")
-                                    }
-                                }
-                            }
-                    }
+                    emailRow(email,
+                             senderCount: email.fromAddress.isEmpty ? 0 : senderCounts[email.fromAddress, default: 0],
+                             subjectCount: subjectCounts[email.subject.normalizedSubjectKey, default: 0])
+                }
                 } header: {
                     sectionHeader(
                         title: "Email",
@@ -573,7 +418,170 @@ struct SummaryView: View {
         .refreshable { await inbox.refresh() }
     }
 
-/// Inline action shown inside a section when there are no rows to
+    @ViewBuilder
+    private func chatRow(_ chat: ChatMessage) -> some View {
+    ChatRow(chat: chat, isStarred: inbox.isStarredName(chat.from), onTap: {
+        #if DEBUG
+        log.info("chat tap chatId=\(chat.chatId ?? "nil", privacy: .public)")
+        #endif
+        previewTarget = .chat(chat)
+    })
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            if chat.chatId != nil {
+                Button {
+                    Task { await inbox.markChatRead(chat) }
+                } label: {
+                    Label("Mark Read", systemImage: "checkmark.bubble")
+                }
+                .tint(.green)
+            }
+        }
+        .contextMenu {
+            if chat.chatId != nil {
+                Button {
+                    previewTarget = .chat(chat, openComposer: true)
+                } label: {
+                    Label("Reply", systemImage: "arrowshape.turn.up.left")
+                }
+                Button {
+                    Task { await inbox.markChatRead(chat) }
+                } label: {
+                    Label("Mark read", systemImage: "checkmark.bubble")
+                }
+            }
+            if let url = chat.webUrl {
+                // Divider only when there's actual content
+                // above it — otherwise a webUrl-only chat
+                // would render with a leading separator.
+                if chat.chatId != nil { Divider() }
+                Button {
+                    UIPasteboard.general.string = url
+                } label: {
+                    Label("Copy chat link", systemImage: "doc.on.doc")
+                }
+                Button {
+                    openChat(chat)
+                } label: {
+                    Label("Open in Teams", systemImage: "arrow.up.forward.app")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func emailRow(_ email: Email, senderCount: Int, subjectCount: Int) -> some View {
+        // Look up the meeting only for actionable invites —
+        // skips the search for the common non-invite case.
+        let matchingMeeting = email.isInvite ? inbox.meetingMatching(email) : nil
+        EmailRow(
+            email: email,
+            isStarred: inbox.isStarred(email),
+            reminder: inbox.reminders[email.id],
+            matchingMeeting: matchingMeeting,
+            onTap: {
+                #if DEBUG
+                log.info("email tap id=\(email.id, privacy: .public)")
+                #endif
+                previewTarget = .email(email)
+            },
+            onRsvp: { response in
+                if let id = matchingMeeting?.id {
+                    Task { await inbox.respondToMeeting(response, meetingId: id) }
+                }
+            },
+            onConflictTap: {
+                if let m = matchingMeeting { conflictTarget = m }
+            }
+        )
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button {
+                    Task { await inbox.markRead(emailId: email.id) }
+                } label: {
+                    Label("Mark Read", systemImage: "envelope.open")
+                }
+                .tint(.green)
+            }
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                Button {
+                    Task { await inbox.setFlagged(!email.isFlagged, emailId: email.id) }
+                } label: {
+                    Label(email.isFlagged ? "Unflag" : "Flag",
+                          systemImage: email.isFlagged ? "flag.slash" : "flag")
+                }
+                .tint(.orange)
+            }
+            .contextMenu {
+                Button {
+                    previewTarget = .email(email, openComposer: true)
+                } label: {
+                    Label("Reply", systemImage: "arrowshape.turn.up.left")
+                }
+                Button {
+                    forwardEmail = email
+                } label: {
+                    Label("Forward", systemImage: "arrowshape.turn.up.right")
+                }
+                Button {
+                    Task { await inbox.markRead(emailId: email.id) }
+                } label: {
+                    Label("Mark read", systemImage: "envelope.open")
+                }
+                if senderCount > 1 {
+                    Button {
+                        Task { await inbox.markAllFromSenderRead(email.fromAddress) }
+                    } label: {
+                        Label("Mark read: \(senderCount) from this sender",
+                              systemImage: "envelope.open")
+                    }
+                }
+                if subjectCount > 1 {
+                    Button {
+                        Task { await inbox.markAllWithSubjectRead(email.subject) }
+                    } label: {
+                        Label("Mark read: \(subjectCount) with this subject",
+                              systemImage: "envelope.open")
+                    }
+                }
+                Button {
+                    Task { await inbox.setFlagged(!email.isFlagged, emailId: email.id) }
+                } label: {
+                    Label(email.isFlagged ? "Unflag" : "Flag",
+                          systemImage: email.isFlagged ? "flag.slash" : "flag")
+                }
+                if !email.fromAddress.isEmpty {
+                    Button {
+                        if inbox.isStarred(email) {
+                            inbox.unstar(address: email.fromAddress)
+                        } else {
+                            inbox.star(email)
+                        }
+                    } label: {
+                        Label(inbox.isStarred(email) ? "Unstar sender" : "Star sender",
+                              systemImage: inbox.isStarred(email) ? "star.slash" : "star")
+                    }
+                }
+                emailReminderMenu(for: email, inbox: inbox)
+                Divider()
+                emailDispositionMenu(for: email, inbox: inbox,
+                                     onMove: { moveTarget = $0 })
+                if !email.fromAddress.isEmpty {
+                    Divider()
+                    Button {
+                        UIPasteboard.general.string = email.fromAddress
+                    } label: {
+                        Label("Copy sender address", systemImage: "doc.on.doc")
+                    }
+                }
+            }
+    }
+
+    /// Inline action shown inside a section when there are no rows to
     /// display. Subtle styling (muted text, footnote font) so the empty
     /// state doesn't shout louder than the populated state.
     private func emptyStateButton(label: String,
