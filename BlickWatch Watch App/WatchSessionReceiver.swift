@@ -361,27 +361,48 @@ final class WatchSessionReceiver: NSObject {
         }
     }
 
-    @MainActor
-    fileprivate func applyIncoming(_ context: [String: Any]) {
+    /// Writes a pushed context to the App Group and reloads the watch widgets
+    /// before returning, on the session's delegate queue. A background wake for
+    /// WatchConnectivity ends once delivery finishes, so the complications must
+    /// be current by then rather than after a hop to the main actor.
+    fileprivate func receive(_ context: [String: Any]) {
         guard let data = context[WireKey.snapshot] as? Data else {
-            logger.error("applyIncoming: missing snapshot payload")
+            logger.error("receive: missing snapshot payload")
             return
         }
         guard let decoded = try? JSONDecoder().decode(BlickSnapshot.self, from: data) else {
-            logger.error("applyIncoming: failed to decode snapshot")
+            logger.error("receive: failed to decode snapshot")
             return
         }
         let clock = (context[WireKey.solarClock] as? Data).flatMap { try? JSONDecoder().decode(SolarClock.self, from: $0) }
-        solarClock = clock
         SolarClock.save(clock, suite: BlickSnapshot.watchAppGroupIdentifier)
-        apply(decoded)
+        Self.persist(decoded)
+        Task { @MainActor in
+            self.solarClock = clock
+            self.snapshot = decoded
+        }
     }
 
     @MainActor
     private func apply(_ newSnapshot: BlickSnapshot) {
         snapshot = newSnapshot
-        newSnapshot.saveToAppGroup(suite: BlickSnapshot.watchAppGroupIdentifier)
+        Self.persist(newSnapshot)
+    }
+
+    private static func persist(_ snapshot: BlickSnapshot) {
+        snapshot.saveToAppGroup(suite: BlickSnapshot.watchAppGroupIdentifier)
         WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    /// Holds a WatchConnectivity background wake open until the session has
+    /// activated and handed over everything queued for the watch, capped so a
+    /// session that never settles cannot hold the wake past its budget.
+    @MainActor
+    func receivePending() async {
+        let deadline = Date().addingTimeInterval(15)
+        while Date() < deadline, !isActivated || WCSession.default.hasContentPending {
+            try? await Task.sleep(for: .milliseconds(200))
+        }
     }
 
     enum WireKey {
@@ -428,23 +449,21 @@ extension WatchSessionReceiver: WCSessionDelegate {
             }
             return
         }
+        // Adopt the receivedApplicationContext that was waiting at
+        // activation, so a watch launched after the phone has already
+        // pushed sees the latest state immediately.
         let pending = session.receivedApplicationContext
+        if !pending.isEmpty {
+            receive(pending)
+        }
         Task { @MainActor in
             self.isActivated = (activationState == .activated)
-            // Adopt the receivedApplicationContext that was waiting at
-            // activation, so a watch launched after the phone has
-            // already pushed sees the latest state immediately.
-            if !pending.isEmpty {
-                self.applyIncoming(pending)
-            }
         }
     }
 
     func session(_ session: WCSession,
                  didReceiveApplicationContext applicationContext: [String: Any]) {
-        Task { @MainActor in
-            self.applyIncoming(applicationContext)
-        }
+        receive(applicationContext)
     }
 
     func session(_ session: WCSession,
@@ -458,6 +477,10 @@ extension WatchSessionReceiver: WCSessionDelegate {
     }
 
     func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+        if userInfo[WireKey.snapshot] != nil {
+            receive(userInfo)
+            return
+        }
         nonisolated(unsafe) let userInfo = userInfo
         Task { @MainActor in
             _ = await WatchSignInRelay.shared.handle(userInfo)

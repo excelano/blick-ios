@@ -95,6 +95,12 @@ final class PhoneConnectivity: NSObject {
         } catch {
             logger.error("updateApplicationContext failed: \(error.localizedDescription, privacy: .public)")
         }
+        let content = ComplicationContent(snapshot)
+        if session.isComplicationEnabled, session.remainingComplicationUserInfoTransfers > 0,
+           content != ComplicationContent.lastSent() {
+            session.transferCurrentComplicationUserInfo(context)
+            content.recordSent()
+        }
     }
 
     /// Push whatever snapshot is currently sitting in the App Group.
