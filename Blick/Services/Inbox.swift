@@ -1304,7 +1304,9 @@ final class Inbox {
             try await graphClient.markEmailRead(id: emailId)
         } catch {
             logger.error("markRead failed: \(error.localizedDescription, privacy: .public)")
-            guard let removed else { return }
+            // A message moved or deleted while the call was in flight has a new
+            // id; restoring the row under the old one leaves it dead.
+            guard let removed, (error as? GraphError)?.isNotFound != true else { return }
             let insertAt = summary?.emails.firstIndex(where: { $0.received < removed.email.received })
                 ?? summary?.emails.count ?? 0
             summary?.emails.insert(removed.email, at: insertAt)

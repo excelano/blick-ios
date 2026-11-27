@@ -166,6 +166,13 @@ public enum GraphError: LocalizedError {
     case invalidResponse
     case httpError(method: String, path: String, status: Int, body: String)
 
+    /// Graph holds nothing under the requested id, as after a move gave the
+    /// message a new one.
+    public var isNotFound: Bool {
+        if case .httpError(_, _, 404, _) = self { return true }
+        return false
+    }
+
     public var errorDescription: String? {
         switch self {
         case .invalidURL(let path):
