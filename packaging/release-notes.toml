@@ -2,13 +2,26 @@
 # against the release being cut, so notes left from last time stop the release
 # rather than reaching the listing.
 
-version = "1.9.5"
+version = "1.9.6"
 
 [locales."en-us"]
 whats-new = """
-Mail, chats and the message preview show their times in the new form as \
-soon as you change a Bogenzeit setting, rather than after the next refresh \
-or scroll.
+Attach photos and files to an email you write, reply to or forward, and ask \
+Blick to remind you to come back to an email later, with a notification at \
+the time you pick.
+
+Schedule a meeting with a Teams link from Blick. Once you add attendees, \
+Blick shows who is free and can find a time that suits everyone.
+
+The full email and chat lists can show only your starred senders, and Show \
+older at the end of each list reaches further back. Settings can put mail \
+and chats in one list, send a morning brief with your first meeting and \
+unread counts, and set you Offline in Teams outside your Outlook working \
+hours. A Focus can now set your Teams presence: add the Blick filter to it \
+in iOS Settings.
+
+Apple Watch complications stay current while the watch app is closed, and an \
+email you delete just after opening it no longer comes back to the list.
 
 As always, Blick talks only to Microsoft. No backend, no analytics, no \
 third-party SDKs.
